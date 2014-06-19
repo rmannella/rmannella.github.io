@@ -1,0 +1,195 @@
+@import url(http://fonts.googleapis.com/css?family=Muli);
+
+body {
+	font-family: "Century Gothic", "Muli", sans-serif;
+	background-color: #fff;
+}
+
+header {
+	position: fixed;
+	background-color: white;
+	margin-top: -10px;
+	width: 100%;
+	height: 82px;
+}
+
+#logo {
+	height: 100px;
+	float: left;
+	margin-top: -5px;
+	margin-left: -30px;
+}
+
+nav {
+	float: right;
+	margin-top: 12.5px;
+}
+
+nav ul li {
+	text-decoration: none;
+	position: relative;
+	display: inline-block;
+	font-size: 1.25em;
+	height: 1em;
+	text-align: center;
+	padding: 0em 20px 0em 20px;
+}
+
+a {
+	text-decoration: none;
+	color: #00aeef;
+}
+
+a:hover {
+	color: #0092c8;
+}
+
+div {
+	clear: both;
+	height: 100vh;
+	padding: 30px 1px 0px 10px;
+}
+
+h2 {
+	color: #b2d234;
+	font-size: 5em;
+	padding: 0px 50px 0px 50px;
+}
+
+h3 {
+	font-size: 2.5em;
+	color: #00aeef;
+	padding: 0px 100px 0px 100px;
+}
+
+p {
+	font-size: 2em;
+	padding: 0px 100px 0px 100px;
+	font-weight:normal;
+}
+
+#home {
+	text-align: center;
+}
+
+#home h2 {
+	padding-top: 50px;
+}
+
+.columnleft {
+	width: 45%;
+	float: left;
+	clear: none;
+	height: 100vh;
+}
+
+.columnleft img {
+	width: 90%;
+	display: inline-block;
+	padding: 0px 50px 0px 50px;
+}
+
+.columnright {
+	width: 45%;
+	float: right;
+	clear: none;
+	display: inline-block;
+}
+
+.columnright img {
+	width: 90%;
+	display: inline-block;
+}
+
+#who {
+	padding-top: 50px;
+}
+
+#who .columnright {
+	padding: 0px;
+	margin: 0px;
+}
+
+#who .columnleft {
+	padding: 0px;
+	margin: 0px;
+}
+
+#who .columnleft p {
+	margin-top: 0px;
+	padding-right: 0px;
+	font-size: 1.25em;
+}
+
+#what {
+	padding-top: 50px;
+}
+
+#portfolio {
+	padding-top: 50px;
+	min-height: 300px;
+	text-align: center;
+}
+
+#portfolio h2 {
+	font-size: 4em;
+}
+
+#portfolio img {
+	height: 40%;
+	display: inline-block;
+	padding: 20px;
+
+}
+
+#contact {
+	height: 50vh;
+	text-align: center;
+}
+
+#contact h2 {
+	margin-bottom: 0px;
+	margin-top: 110px;
+}
+
+#contact .columnright {
+	text-align: left;
+	padding: 0px;
+}
+
+#contact .columnleft {
+	padding: 100px 0px 0px 10%;
+}
+
+#contact .columnleft img {
+	height: 100px;
+	width: auto;
+}
+
+footer {
+	clear: both;
+	position: fixed;
+	bottom: 0px;
+	width: 100%;
+	font-size: .3em;
+	background-color: #fff;
+}
+
+footer p:first-child {
+	font-size: 2em;
+	float: left;
+}
+
+footer p:nth-child(2) {
+	font-size: 2em;
+	float: right;
+	color: #00aeef
+}
+
+footer a {
+	color: black;
+}
+
+footer a:hover {
+	color: black;
+}
