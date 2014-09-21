@@ -116,12 +116,12 @@ object {
 #resume img {
 	width: 65%;
 	height: auto;
-	border:2px solid black;
+	border:0px solid black;
 	text-align: center;
 }
 
 #resume img:hover {
-	border:2px solid black;
+	border:0px solid black;
 	box-shadow: 1px 1px 20px #999;
 }
 
