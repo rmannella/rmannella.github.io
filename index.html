@@ -4,100 +4,39 @@
 
 <head><title>I am Rachel.</title><link rel="shortcut icon"
        href="/images/favicon.ico">
-      <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
-<script>
-$(function() {
-  $('a[href*=#]:not([href=#])').click(function() {
-    if (location.pathname.replace(/^\//,'') == this.pathname.replace(/^\//,'') && location.hostname == this.hostname) {
-      var target = $(this.hash);
-      target = target.length ? target : $('[name=' + this.hash.slice(1) +']');
-      if (target.length) {
-        $('html,body').animate({
-          scrollTop: target.offset().top
-        }, 1000);
-        return false;
-      }
-    }
-  });
-});
-</script>
+
    </head>
-<link type="text/css" rel="stylesheet" href="css/style.css">
+<link type="text/css" rel="stylesheet" href="css/stylesheet.css">
+  <link rel="stylesheet" href="css/normalize.css">
+  <link rel="stylesheet" href="css/skeleton.css">
 
 <body>
-	<header id="header">
-		<a href="#"><img src="images/rm/logo-01.png" id="logo" border="0"></a>
-		<nav>
-			<ul>
-				<li><a href="#">Home</a></li>
-				<li><a href="#who">Who I Am</a></li>
-				<!--<li><a href="#what">What I Do</a></li>!-->
-				<li><a href="#portfolio">What I've Done</a></li>
-				<li><a href="#contact">Contact Me</a></li>
-			</ul>
-		</nav>
-	</header>
+  <div id="home" class="container">
+      <br>
+      <br>
+      <img src="images/logo.png">
+      <br>
+      <br>
+      <h1>Hello, my name is Rachel.</h1>
+  </div>
+  <div id="am" class="container">
+    <div class="one-half column">
+      <p>I am currently a senior at Rensselaer Polytechnic Institute studying Design, Innovation, & Society and Mechanical Engineering. This interdisciplinary dual-degree allows me to bring a unique perspective to the innovation industry because I have a foundation in both design practices and engineering techniques; I am at the crossroads between technicality and design with an added ability to think critically about technology and its impact on humanity and our environment.</p>
+      <p>I am a quick and curious learner with expertise in many disciplines. I speak engineer. I speak design. I have project experience and have practice presenting and interacting with both users and consumers. In any field I pursue, I will be an asset because I bring an interdisciplinary set of technical and design skills. Beyond that I have thought analytically about these capabilities and have the confidence to thrive at the intersection between design, technicality, and social analysis.</p>
+    </div>
+    <div class="one-half column">
+      <img src="images/venn.png">
+    </div>
+  </div>
+  <div id="done" class="container">
+    <h1>Projects</h1>
+<h3>Coming Soon.</h3>
 
-	<div id="home">
-		<div class="columnleft">
-			<h2>Hey.</h2> 
-			<h3 style="margin-bottom:.1em;">My name is</h3>
-			<img src="images/name.png" width=80% border="0">
-		</div>
-		<div class="columnright"><img src="images/10295231_10203092386083988_8093550573685178378_o.jpg" border="0"></div>
-	</div>
-	
-	<div id="who">
-		<h3>I speak engineer. I speak design.</h3>
-		<div class="columnleft">
-			<p>I am currently a junior at Rensselaer Polytechnic Institute studying Design, Innovation, & Society and Mechanical Engineering. This interdisciplinary dual-degree allows me to bring a unique perspective to the innovation industry because I have a foundation in both design practices and engineering techniques; I am at the crossroads between technicality and design with an added ability to think critically about technology and its impact on humanity and our environment.</p>
-			<p>I am a quick and curious learner with expertise in many disciplines. I speak engineer. I speak design. I have project experience and have practiced presenting and interacting with both users and consumers. In any field I pursue, I will be an asset because I bring an interdisciplinary set of technical and design skills. Beyond that I have thought analytically about these capabilities and have the confidence to thrive at the intersection between design, technicality, and social analysis.</p>
-		</div>
-		<div class="columnright">
-			<img src="images/venn diagram.png" border="0">
-		</div>
-	</div>
-	
-	<div id="portfolio">
-		<h2>I made this stuff.</h2>
-		<a href="kubu.html"><img src="images/portfolio/DSC_0024.jpeg" 
-			onmouseover="this.src='images/portfolio/DSC_0024_hover.png'"
-			onmouseout="this.src='images/portfolio/DSC_0024.jpeg'" border="0"></a>
-		<a href="toolbook.html"><img src="images/portfolio/photo 2-1.JPG"
-			onmouseover="this.src='images/portfolio/photo 2-1_hover.jpg'"
-			onmouseout="this.src='images/portfolio/photo 2-1.JPG'" border="0"></a>
-		<a href="knolling.html"><img src="images/portfolio/knolling_poster_design.jpg"
-			onmouseover="this.src='images/portfolio/knolling_poster_design_hover.jpg'"
-			onmouseout="this.src='images/portfolio/knolling_poster_design.jpg'" border="0"></a>
-		<a href="backpack.html"><img src="images/portfolio/front.jpg" 
-			onmouseover="this.src='images/portfolio/front_hover.jpg'"
-			onmouseout="this.src='images/portfolio/front.jpg'" border="0"></a>
-		<a href="graphic.html"><img src="images/portfolio/tshirt nrb2.jpg" 
-			onmouseover="this.src='images/portfolio/tshirt nrb2_hover.jpg'"
-			onmouseout="this.src='images/portfolio/tshirt nrb2.jpg'" border="0"></a>
-	</div>
-	
-	<div id="contact">
-		<h2>Get in touch.</h2>
-		<div class="columnleft">
-			<a href="mailto:mannella.r@gmail.com"><img src="images/email.png" 
-			onmouseover="this.src='images/email_hover.png'"
-			onmouseout="this.src='images/email.png'" class="button" border="0"></a>
-		<h3>OR</h3>
-			<a href="resume.html"><img src="images/resume_button_hover.png" 
-			onmouseover="this.src='images/resume_button.png'"
-			onmouseout="this.src='images/resume_button_hover.png'" class="button" border="0"></a>
-		</div>
-		<div class="columnright">
-			<h3>Things I like to hear:</h3>
-			<p>Offer me a job (wink, wink).</p>
-			<p>Let's get coffee, meet in person, be real humans.</p>
-			<p>Give me some feedback! I love critique, good and bad; helps me learn and grow.</p>
-		</div>
-	</div>
-	<footer>
-		<p><a href="#">Rachel Mannella</a> &copy 2014</p>
-		<p>I speak engineer. I speak design.</p>
-	</footer>
+  </div>
+  <div id="contact" class="container">
+    <div class="one-half column"><a href="rmannella_resume.pdf"><img src="images/resume.png"></a><h2>My Resume</h2></div>
+    <div class="one-half column"><a href="mailto:mannella.r@gmail.com"><img src="images/mail.png"></a><h2>My Email</h2></div>
+  </div>
 </body>
-</html>
+
+<footer class="container">Rachel Mannella &copy 2015</footer>
