@@ -77,3 +77,13 @@ p {
 	width: 100%;
 	height: auto;
 }
+
+.graphic {
+	text-align: center;
+
+}
+
+.graphic img {
+	width: 70%;
+	height: auto;
+}
