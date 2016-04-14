@@ -34,8 +34,8 @@ img {
 }
 
 #home {
-	padding-top: 15%;
-	min-height: 100vh;
+	padding-top: 10%;
+	padding-bottom: 5%;
 	text-align: center;
 }
 
