@@ -9,9 +9,6 @@ html {
     background-color: black;
 }
 
-img {
-    max-width: 100%;
-}
 
 /**.navbar {
 	padding: 8px;
@@ -36,7 +33,7 @@ footer {
 
 img {
 	height: auto;
-	width: 30%;
+	width: 60%;
 }
 
 #am img {
@@ -97,4 +94,12 @@ p {
 .graphic img {
 	width: 70%;
 	height: auto;
+}
+
+.center {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    width: 50%;
+    vertical-align: middle;
 }
