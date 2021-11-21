@@ -4,6 +4,15 @@
   src: url(https://fonts.googleapis.com/css?family=Raleway);
 }
 
+
+html { 
+    background-color: black;
+}
+
+img {
+    max-width: 100%;
+}
+
 /**.navbar {
 	padding: 8px;
 	text-align: left;
@@ -14,6 +23,7 @@
 	z-index: 9999;
 }**/
 
+
 footer {
 	text-align: center;
 }
@@ -21,6 +31,7 @@ footer {
 .container {
 	width: 100%;
 	text-align: left;
+  
 }
 
 img {
