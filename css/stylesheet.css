@@ -12,11 +12,15 @@ html {
 .container {
 	width: 100%;
     vertical-align: middle; 
+    display: flex;
+    Align-items: center;
+    Justify-content: center;
+    height: 100vh;
 }
 
 img {
 	height: auto;
-	width: 60%;
+	width: 90%;
 }
 
 middle {
