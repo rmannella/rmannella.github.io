@@ -7,12 +7,16 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon.svg">
 <link rel="apple-touch-icon" href="icons/icon.svg">
-<meta name="theme-color" content="#5b8def">
+<meta name="theme-color" content="#6c8ead">
 <link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
 <header class="app-header">
-  <h1>To-Do</h1>
+  <div class="brand">
+    <img src="/images/logo.png" alt="Rachel Mannella" class="app-logo">
+    <h1>To-Do</h1>
+  </div>
   <nav class="tabs">
     <button class="tab-btn tab-active" data-panel="panel-today">Today</button>
     <button class="tab-btn" data-panel="panel-projects">Projects</button>
@@ -35,12 +39,18 @@
       <select id="task-location"></select>
     </div>
 
+    <div class="scope-toggle">
+      <button type="button" class="scope-btn scope-active" data-scope="today">Today</button>
+      <button type="button" class="scope-btn" data-scope="all">All tasks</button>
+    </div>
+
     <div class="filters">
       <select id="project-filter"></select>
       <div id="tag-filter" class="chip-row"></div>
     </div>
 
-    <div id="task-list" class="task-list"></div>
+    <div id="task-list-open" class="task-list"></div>
+    <div id="task-list-done" class="task-list task-list-done"></div>
 
     <div class="digest-panel">
       <div id="digest-today"></div>
@@ -52,7 +62,8 @@
     <h2>Projects</h2>
     <form id="add-project-form" class="inline-form">
       <input id="project-name-input" type="text" placeholder="Project name">
-      <input id="project-color-input" type="color" value="#5b8def">
+      <div id="project-color-swatches" class="swatch-picker"></div>
+      <input type="hidden" id="project-color-input" value="">
       <button type="submit" class="primary-btn">Add</button>
     </form>
     <div id="projects-list" class="list"></div>
@@ -61,12 +72,24 @@
   <section id="panel-locations" class="panel">
     <h2>Locations</h2>
     <p class="hint">Geofence radius is fixed at ~150m for all locations.</p>
-    <form id="add-location-form" class="inline-form">
+    <form id="add-location-form" class="location-form">
       <input id="location-name-input" type="text" placeholder="Label (e.g. Home)">
-      <input id="location-lat-input" type="text" placeholder="Lat" inputmode="decimal">
-      <input id="location-lng-input" type="text" placeholder="Lng" inputmode="decimal">
-      <button type="button" id="use-current-location-btn" class="icon-btn" title="Use current location">📍</button>
-      <button type="submit" class="primary-btn">Add</button>
+
+      <div class="address-search-row">
+        <input id="location-address-input" type="text" placeholder="Search an address">
+        <button type="button" id="address-search-btn" class="secondary-btn">Search</button>
+      </div>
+      <div id="address-results" class="address-results hidden"></div>
+
+      <div id="location-map" class="location-map"></div>
+      <p class="hint">Tap or drag the pin on the map to set the exact spot.</p>
+
+      <div class="coord-row">
+        <input id="location-lat-input" type="text" placeholder="Lat" inputmode="decimal">
+        <input id="location-lng-input" type="text" placeholder="Lng" inputmode="decimal">
+        <button type="button" id="use-current-location-btn" class="icon-btn" title="Use current location">📍</button>
+      </div>
+      <button type="submit" class="primary-btn">Add location</button>
     </form>
     <div id="locations-list" class="list"></div>
   </section>
@@ -92,9 +115,68 @@
   </section>
 </main>
 
+<div id="edit-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <h2>Edit task</h2>
+    <form id="edit-task-form">
+      <label class="field-label">Title
+        <input id="edit-title" type="text" placeholder="Title">
+      </label>
+      <label class="field-label">Project
+        <select id="edit-project"></select>
+      </label>
+      <label class="field-label">Priority tags
+        <input id="edit-tags" type="text" placeholder="comma separated">
+      </label>
+      <div class="edit-row">
+        <label class="field-label">Due date
+          <input id="edit-due-date" type="date">
+        </label>
+        <label class="field-label">Due time
+          <input id="edit-due-time" type="time">
+        </label>
+      </div>
+      <label class="field-label">Location trigger
+        <select id="edit-location"></select>
+      </label>
+      <label class="field-label">Repeat
+        <select id="edit-recurrence-freq">
+          <option value="">Does not repeat</option>
+          <option value="daily">Daily</option>
+          <option value="weekly">Weekly</option>
+          <option value="custom">Custom</option>
+        </select>
+      </label>
+      <div id="edit-recurrence-custom" class="edit-row hidden">
+        <label class="field-label">Every
+          <input id="edit-recurrence-interval" type="number" min="1" value="1">
+        </label>
+        <label class="field-label">Unit
+          <select id="edit-recurrence-unit">
+            <option value="day">day(s)</option>
+            <option value="week">week(s)</option>
+          </select>
+        </label>
+      </div>
+      <div class="modal-actions">
+        <button type="button" id="edit-delete-btn" class="danger-btn">Delete task</button>
+        <div class="modal-actions-right">
+          <button type="button" id="edit-cancel-btn" class="secondary-btn">Cancel</button>
+          <button type="submit" class="primary-btn">Save</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <script src="js/db.js"></script>
 <script src="js/nlp.js"></script>
 <script src="js/geofence.js"></script>
+<script src="js/location-map.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

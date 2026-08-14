@@ -34,6 +34,30 @@ is published — no separate CI workflow needed.
 - **Manual export/import** (Settings tab) as a JSON file — a practical
   stopgap for moving data between devices by hand.
 - Installable PWA (`manifest.webmanifest`).
+- **Edit any task** after adding it (title, project, tags, due date/time,
+  location trigger, recurrence) via the ✎ button, which opens an edit
+  sheet.
+- **Manual drag-to-reorder** of open tasks (drag the ⠿ handle), backed by
+  [SortableJS](https://github.com/SortableJS/Sortable) and a `sort_order`
+  field on each task. Completed tasks stay pinned below and aren't
+  reorderable.
+- **Today vs. All tasks scope toggle** — Today only shows tasks due today
+  or overdue (undated, location-only tasks are intentionally excluded);
+  "All tasks" shows every open task regardless of due date, which is where
+  those location-only tasks live until they're given a date.
+- **Address search and map pin** for locations, via
+  [Leaflet](https://leafletjs.com/) (map/pin UI) and
+  [OpenStreetMap Nominatim](https://nominatim.org/) (free geocoding, no API
+  key). Both load from CDN and are precached by the service worker for
+  offline *use of the library code*, but actual searches and map tiles
+  still need a live connection. Nominatim's usage policy caps this at
+  light, interactive use (no bulk geocoding) — fine for a personal app,
+  not something to scale up without switching to a paid provider.
+- **Muted color palette** for projects — a fixed set of dusty/muted swatches
+  instead of an open color picker, and the app's accent color was toned
+  down to match.
+- Logo in the header, pulled from `/images/logo.png` (the same file the
+  main site uses) rather than duplicated into this folder.
 
 ## What's intentionally NOT implemented (needs real backend infra)
 
@@ -63,6 +87,14 @@ Also out of scope for the same reason (needs a server):
   LLM call. It's structured so a `parseEntry()` call could be replaced with
   a fetch to a real parsing endpoint later.
 - **Google OAuth / accounts.**
+
+## Known limitation: reordering under an active filter
+
+Drag-to-reorder renumbers `sort_order` only for the tasks currently visible
+(after project/tag filtering). If you reorder while a filter is active, the
+new order is relative to that filtered set — clearing the filter afterward
+can interleave those tasks with others in a way that isn't perfectly
+predictable. Reordering with no filter active avoids this entirely.
 
 ## Running locally
 
