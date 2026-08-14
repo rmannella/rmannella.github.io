@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>To-Do</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg">
+<link rel="apple-touch-icon" href="icons/icon.svg">
+<meta name="theme-color" content="#5b8def">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<header class="app-header">
+  <h1>To-Do</h1>
+  <nav class="tabs">
+    <button class="tab-btn tab-active" data-panel="panel-today">Today</button>
+    <button class="tab-btn" data-panel="panel-projects">Projects</button>
+    <button class="tab-btn" data-panel="panel-locations">Locations</button>
+    <button class="tab-btn" data-panel="panel-settings">Settings</button>
+  </nav>
+</header>
+
+<main>
+  <section id="panel-today" class="panel panel-active">
+    <form id="add-task-form" class="add-task-form">
+      <input id="task-input" type="text" placeholder='e.g. "remind me when I get home to take out the trash and call mom"' autocomplete="off">
+      <button type="button" id="mic-btn" class="icon-btn mic-btn" title="Voice input">🎤</button>
+      <button type="submit" class="primary-btn">Add</button>
+    </form>
+
+    <div class="add-task-extras">
+      <select id="task-project"></select>
+      <input id="task-tags" type="text" placeholder="priority tags, comma separated">
+      <select id="task-location"></select>
+    </div>
+
+    <div class="filters">
+      <select id="project-filter"></select>
+      <div id="tag-filter" class="chip-row"></div>
+    </div>
+
+    <div id="task-list" class="task-list"></div>
+
+    <div class="digest-panel">
+      <div id="digest-today"></div>
+      <div id="digest-week"></div>
+    </div>
+  </section>
+
+  <section id="panel-projects" class="panel">
+    <h2>Projects</h2>
+    <form id="add-project-form" class="inline-form">
+      <input id="project-name-input" type="text" placeholder="Project name">
+      <input id="project-color-input" type="color" value="#5b8def">
+      <button type="submit" class="primary-btn">Add</button>
+    </form>
+    <div id="projects-list" class="list"></div>
+  </section>
+
+  <section id="panel-locations" class="panel">
+    <h2>Locations</h2>
+    <p class="hint">Geofence radius is fixed at ~150m for all locations.</p>
+    <form id="add-location-form" class="inline-form">
+      <input id="location-name-input" type="text" placeholder="Label (e.g. Home)">
+      <input id="location-lat-input" type="text" placeholder="Lat" inputmode="decimal">
+      <input id="location-lng-input" type="text" placeholder="Lng" inputmode="decimal">
+      <button type="button" id="use-current-location-btn" class="icon-btn" title="Use current location">📍</button>
+      <button type="submit" class="primary-btn">Add</button>
+    </form>
+    <div id="locations-list" class="list"></div>
+  </section>
+
+  <section id="panel-settings" class="panel">
+    <h2>Settings</h2>
+    <div class="settings-row">
+      <button id="notif-btn" class="primary-btn">Enable notifications</button>
+      <span id="notif-status" class="hint"></span>
+    </div>
+    <div class="settings-row">
+      <button id="export-btn" class="secondary-btn">Export backup (JSON)</button>
+    </div>
+    <div class="settings-row">
+      <label for="import-input" class="secondary-btn file-label">Import backup (JSON)</label>
+      <input id="import-input" type="file" accept="application/json" hidden>
+    </div>
+    <p class="hint">
+      All data is stored locally on this device only. There is no account sync
+      between devices yet — see the project README for what's needed to add
+      real cross-device sync.
+    </p>
+  </section>
+</main>
+
+<script src="js/db.js"></script>
+<script src="js/nlp.js"></script>
+<script src="js/geofence.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
