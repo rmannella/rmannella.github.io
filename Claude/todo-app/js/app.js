@@ -4,6 +4,7 @@ const state = {
   tasks: [],
   projects: [],
   locations: [],
+  labels: [],
   activeProjectId: 'all',
   activeTag: 'all',
   scope: 'today',
@@ -14,6 +15,8 @@ let recognizer = null;
 let sortableInstance = null;
 let locationMapInitialized = false;
 let toastTimer = null;
+let pendingDelete = null;
+let taskProjectManuallySet = false;
 
 function dateKey(d) {
   const y = d.getFullYear();
@@ -50,6 +53,7 @@ async function loadAll() {
   state.tasks = await DB.getAll('tasks');
   state.projects = await DB.getAll('projects');
   state.locations = await DB.getAll('locations');
+  state.labels = await DB.getAll('labels');
 }
 
 async function rolloverAndPurge() {
@@ -107,6 +111,7 @@ function taskSortValue(t) {
 function allPriorityTags() {
   const tags = new Set();
   state.tasks.forEach(t => (t.priority_tags || []).forEach(tag => tags.add(tag)));
+  state.labels.forEach(l => tags.add(l.name));
   return Array.from(tags).sort();
 }
 
@@ -120,6 +125,37 @@ function sortedProjects() {
 
 function sortedLocations() {
   return [...state.locations].sort((a, b) => a.label.localeCompare(b.label));
+}
+
+function sortedLabels() {
+  return [...state.labels].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function labelByName(name) {
+  return state.labels.find(l => l.name.toLowerCase() === name.toLowerCase());
+}
+
+function hexToRgba(hex, alpha) {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.substring(0, 2), 16);
+  const g = parseInt(h.substring(2, 4), 16);
+  const b = parseInt(h.substring(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function tagColor(tagName) {
+  const l = labelByName(tagName);
+  return l ? l.color : null;
+}
+
+function tagBadge(tagName) {
+  const badge = el('span', 'tag-badge', tagName);
+  const color = tagColor(tagName);
+  if (color) {
+    badge.style.background = hexToRgba(color, 0.18);
+    badge.style.color = color;
+  }
+  return badge;
 }
 
 function projectName(id) {
@@ -171,16 +207,31 @@ function el(tag, className, text) {
   return e;
 }
 
-function showToast(message, duration = 3500) {
+function showToast(message, opts = {}) {
+  const { duration = 3500, actionLabel, onAction } = opts;
   const toast = document.getElementById('toast');
-  toast.textContent = message;
+  toast.innerHTML = '';
+  toast.appendChild(el('span', null, message));
+  if (actionLabel && onAction) {
+    const actionBtn = el('button', 'toast-action', actionLabel);
+    actionBtn.type = 'button';
+    actionBtn.addEventListener('click', () => {
+      onAction();
+      dismissToast();
+    });
+    toast.appendChild(actionBtn);
+  }
   toast.classList.remove('hidden');
   requestAnimationFrame(() => toast.classList.add('toast-visible'));
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => {
-    toast.classList.remove('toast-visible');
-    setTimeout(() => toast.classList.add('hidden'), 250);
-  }, duration);
+  toastTimer = setTimeout(dismissToast, duration);
+}
+
+function dismissToast() {
+  const toast = document.getElementById('toast');
+  clearTimeout(toastTimer);
+  toast.classList.remove('toast-visible');
+  setTimeout(() => toast.classList.add('hidden'), 250);
 }
 
 function renderProjectFilter() {
@@ -200,6 +251,7 @@ function renderTagFilter() {
     chip.addEventListener('click', () => {
       state.activeTag = tag;
       render();
+      syncAddBarDefaultsFromFilters();
     });
     wrap.appendChild(chip);
   });
@@ -228,9 +280,21 @@ function renderLocationSelectForForm() {
   fillLocationSelect(document.getElementById('task-location'));
 }
 
-function renderColorSwatches() {
-  const wrap = document.getElementById('project-color-swatches');
-  const hiddenInput = document.getElementById('project-color-input');
+function syncAddBarDefaultsFromFilters() {
+  const projectSel = document.getElementById('task-project');
+  const targetProjectId = state.activeProjectId === 'all' ? 'personal' : state.activeProjectId;
+  if ([...projectSel.options].some(o => o.value === targetProjectId)) {
+    projectSel.value = targetProjectId;
+  }
+  taskProjectManuallySet = false;
+
+  const tagsInput = document.getElementById('task-tags');
+  tagsInput.value = state.activeTag === 'all' ? '' : state.activeTag;
+}
+
+function renderColorSwatches(wrapId = 'project-color-swatches', hiddenInputId = 'project-color-input') {
+  const wrap = document.getElementById(wrapId);
+  const hiddenInput = document.getElementById(hiddenInputId);
   if (!hiddenInput.value) hiddenInput.value = MUTED_COLORS[0];
   wrap.innerHTML = '';
   MUTED_COLORS.forEach(color => {
@@ -277,7 +341,7 @@ function taskRow(t, draggable) {
 
   if ((t.priority_tags || []).length) {
     const tagsWrap = el('div', 'task-tags');
-    t.priority_tags.forEach(tag => tagsWrap.appendChild(el('span', 'tag-badge', tag)));
+    t.priority_tags.forEach(tag => tagsWrap.appendChild(tagBadge(tag)));
     main.appendChild(tagsWrap);
   }
   row.appendChild(main);
@@ -326,7 +390,10 @@ function renderTaskList() {
   openList.innerHTML = '';
   doneList.innerHTML = '';
 
-  const visible = state.tasks.filter(isTaskVisible).filter(taskMatchesFilters);
+  const visible = state.tasks
+    .filter(t => !pendingDelete || t.id !== pendingDelete.task.id)
+    .filter(isTaskVisible)
+    .filter(taskMatchesFilters);
   const open = visible.filter(t => t.status !== 'completed').sort((a, b) => taskSortValue(a) - taskSortValue(b));
   const done = visible
     .filter(t => t.status === 'completed')
@@ -352,12 +419,52 @@ function renderProjectsPanel() {
     const swatch = el('span', 'swatch');
     swatch.style.background = p.color || MUTED_COLORS[0];
     row.appendChild(swatch);
-    row.appendChild(el('span', null, p.name));
+
+    const main = el('div', 'list-row-main');
+    main.appendChild(el('span', null, p.name));
+
+    const tagsForProject = new Set();
+    state.tasks
+      .filter(t => (t.project_id || 'personal') === p.id)
+      .forEach(t => (t.priority_tags || []).forEach(tag => tagsForProject.add(tag)));
+    if (tagsForProject.size) {
+      const tagsWrap = el('div', 'task-tags');
+      [...tagsForProject].sort().forEach(tag => tagsWrap.appendChild(tagBadge(tag)));
+      main.appendChild(tagsWrap);
+    }
+    row.appendChild(main);
+
+    const editBtn = el('button', 'icon-btn', '✎');
+    editBtn.title = 'Edit';
+    editBtn.addEventListener('click', () => openProjectEditModal(p.id));
+    row.appendChild(editBtn);
+
     if (p.id !== 'personal') {
       const del = el('button', 'icon-btn', '✕');
       del.addEventListener('click', () => deleteProject(p.id));
       row.appendChild(del);
     }
+    list.appendChild(row);
+  });
+}
+
+function renderLabelsPanel() {
+  const list = document.getElementById('labels-list');
+  list.innerHTML = '';
+  sortedLabels().forEach(l => {
+    const row = el('div', 'list-row');
+    const swatch = el('span', 'swatch');
+    swatch.style.background = l.color || MUTED_COLORS[0];
+    row.appendChild(swatch);
+    row.appendChild(el('span', null, l.name));
+    const editBtn = el('button', 'icon-btn', '✎');
+    editBtn.title = 'Edit';
+    editBtn.addEventListener('click', () => openLabelEditModal(l.id));
+    row.appendChild(editBtn);
+    const del = el('button', 'icon-btn', '✕');
+    del.title = 'Delete';
+    del.addEventListener('click', () => deleteLabel(l.id));
+    row.appendChild(del);
     list.appendChild(row);
   });
 }
@@ -398,6 +505,7 @@ function render() {
   renderLocationSelectForForm();
   renderTaskList();
   renderProjectsPanel();
+  renderLabelsPanel();
   renderLocationsPanel();
   renderDigest();
 }
@@ -406,10 +514,11 @@ async function addTaskFromText(rawText) {
   const text = rawText.trim();
   if (!text) return;
 
-  const entries = parseEntry(text, state.locations);
-  const projectId = document.getElementById('task-project').value || 'personal';
+  const entries = parseEntry(text, state.locations, state.projects);
+  const pickedProjectId = document.getElementById('task-project').value || 'personal';
   const tagsRaw = document.getElementById('task-tags').value.trim();
   const priorityTags = tagsRaw ? tagsRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
+  await ensureLabelsExist(priorityTags);
   const manualLocationId = document.getElementById('task-location').value || null;
 
   const created = [];
@@ -423,6 +532,11 @@ async function addTaskFromText(rawText) {
       else pendingLocationLabel = entry.locationLabel.label;
     }
 
+    let projectId;
+    if (taskProjectManuallySet) projectId = pickedProjectId;
+    else if (entry.projectMatch) projectId = entry.projectMatch.id;
+    else projectId = pickedProjectId;
+
     const task = {
       id: uid(),
       title: entry.title,
@@ -435,7 +549,7 @@ async function addTaskFromText(rawText) {
       pending_location_label: pendingLocationLabel,
       status: 'open',
       completed_at: null,
-      recurrence_rule: null,
+      recurrence_rule: entry.recurrence || null,
       notified_at: null,
       sort_order: Date.now() + i,
       created_at: now,
@@ -446,9 +560,9 @@ async function addTaskFromText(rawText) {
   }
 
   document.getElementById('task-input').value = '';
-  document.getElementById('task-tags').value = '';
   await loadAll();
   render();
+  syncAddBarDefaultsFromFilters();
 
   if (created.length === 1) {
     showToast(`Added "${created[0].title}" — ${friendlyDueLabel(created[0])}`);
@@ -502,9 +616,35 @@ async function pushToTomorrow(id) {
   render();
 }
 
-async function deleteTask(id) {
-  await DB.remove('tasks', id);
+function deleteTask(id) {
+  const task = state.tasks.find(t => t.id === id);
+  if (!task) return;
+  if (pendingDelete) commitPendingDelete();
+
+  const timeoutId = setTimeout(() => commitPendingDelete(), 5500);
+  pendingDelete = { task, timeoutId };
+  render();
+  showToast(`Deleted "${task.title}"`, {
+    duration: 5500,
+    actionLabel: 'Undo',
+    onAction: undoPendingDelete,
+  });
+}
+
+async function commitPendingDelete() {
+  if (!pendingDelete) return;
+  const { task, timeoutId } = pendingDelete;
+  clearTimeout(timeoutId);
+  pendingDelete = null;
+  await DB.remove('tasks', task.id);
   await loadAll();
+  render();
+}
+
+function undoPendingDelete() {
+  if (!pendingDelete) return;
+  clearTimeout(pendingDelete.timeoutId);
+  pendingDelete = null;
   render();
 }
 
@@ -553,6 +693,7 @@ async function saveEditModal() {
   t.project_id = document.getElementById('edit-project').value || 'personal';
   const tagsRaw = document.getElementById('edit-tags').value.trim();
   t.priority_tags = tagsRaw ? tagsRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
+  await ensureLabelsExist(t.priority_tags);
   t.due_date = document.getElementById('edit-due-date').value || null;
   t.due_time = document.getElementById('edit-due-time').value || null;
   t.location_trigger_id = document.getElementById('edit-location').value || null;
@@ -603,6 +744,46 @@ async function deleteProject(id) {
   render();
 }
 
+async function updateProject(id, { name, color }) {
+  const p = state.projects.find(p => p.id === id);
+  if (!p) return;
+  p.name = name;
+  p.color = color;
+  await DB.put('projects', p);
+  await loadAll();
+  render();
+}
+
+function openProjectEditModal(id) {
+  const p = state.projects.find(p => p.id === id);
+  if (!p) return;
+  document.getElementById('project-edit-form').dataset.projectId = id;
+  document.getElementById('project-edit-name-input').value = p.name;
+  document.getElementById('project-edit-color-input').value = p.color || MUTED_COLORS[0];
+  renderColorSwatches('project-edit-color-swatches', 'project-edit-color-input');
+  document.getElementById('project-edit-modal').classList.remove('hidden');
+}
+
+function closeProjectEditModal() {
+  document.getElementById('project-edit-modal').classList.add('hidden');
+}
+
+function setupProjectEditModal() {
+  document.getElementById('project-edit-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const id = document.getElementById('project-edit-form').dataset.projectId;
+    const name = document.getElementById('project-edit-name-input').value.trim();
+    if (!name) return;
+    const color = document.getElementById('project-edit-color-input').value || MUTED_COLORS[0];
+    await updateProject(id, { name, color });
+    closeProjectEditModal();
+  });
+  document.getElementById('project-edit-cancel-btn').addEventListener('click', closeProjectEditModal);
+  document.getElementById('project-edit-modal').addEventListener('click', e => {
+    if (e.target.id === 'project-edit-modal') closeProjectEditModal();
+  });
+}
+
 async function addLocation({ label, lat, lng }) {
   if (!label || Number.isNaN(lat) || Number.isNaN(lng)) return;
   await DB.put('locations', { id: uid(), label, lat, lng });
@@ -620,6 +801,110 @@ async function deleteLocation(id) {
   }
   await loadAll();
   render();
+}
+
+async function putLabelQuiet(name, color) {
+  const existing = labelByName(name);
+  if (existing) return existing;
+  const label = { id: uid(), name: name.trim(), color };
+  await DB.put('labels', label);
+  state.labels.push(label);
+  return label;
+}
+
+async function ensureLabelsExist(tagNames) {
+  for (const name of tagNames) {
+    if (!labelByName(name)) {
+      await putLabelQuiet(name, MUTED_COLORS[state.labels.length % MUTED_COLORS.length]);
+    }
+  }
+}
+
+async function addLabel(name, color) {
+  await putLabelQuiet(name.trim(), color);
+  await loadAll();
+  render();
+}
+
+async function updateLabel(id, { name, color }) {
+  const label = state.labels.find(l => l.id === id);
+  if (!label) return;
+  const oldName = label.name;
+  label.name = name;
+  label.color = color;
+  await DB.put('labels', label);
+  if (oldName.toLowerCase() !== name.toLowerCase()) {
+    const affected = state.tasks.filter(t =>
+      (t.priority_tags || []).some(tag => tag.toLowerCase() === oldName.toLowerCase())
+    );
+    for (const t of affected) {
+      t.priority_tags = t.priority_tags.map(tag =>
+        tag.toLowerCase() === oldName.toLowerCase() ? name : tag
+      );
+      t.updated_at = new Date().toISOString();
+      await DB.put('tasks', t);
+    }
+  }
+  await loadAll();
+  render();
+}
+
+async function deleteLabel(id) {
+  const label = state.labels.find(l => l.id === id);
+  if (!label) return;
+  await DB.remove('labels', id);
+  const affected = state.tasks.filter(t =>
+    (t.priority_tags || []).some(tag => tag.toLowerCase() === label.name.toLowerCase())
+  );
+  for (const t of affected) {
+    t.priority_tags = t.priority_tags.filter(tag => tag.toLowerCase() !== label.name.toLowerCase());
+    t.updated_at = new Date().toISOString();
+    await DB.put('tasks', t);
+  }
+  await loadAll();
+  render();
+}
+
+function openLabelEditModal(id) {
+  const l = state.labels.find(l => l.id === id);
+  if (!l) return;
+  document.getElementById('label-edit-form').dataset.labelId = id;
+  document.getElementById('label-edit-name-input').value = l.name;
+  document.getElementById('label-edit-color-input').value = l.color || MUTED_COLORS[0];
+  renderColorSwatches('label-edit-color-swatches', 'label-edit-color-input');
+  document.getElementById('label-edit-modal').classList.remove('hidden');
+}
+
+function closeLabelEditModal() {
+  document.getElementById('label-edit-modal').classList.add('hidden');
+}
+
+function setupLabelForms() {
+  document.getElementById('add-label-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const input = document.getElementById('label-name-input');
+    const name = input.value.trim();
+    if (!name) return;
+    const colorInput = document.getElementById('label-color-input');
+    await addLabel(name, colorInput.value || MUTED_COLORS[0]);
+    input.value = '';
+    colorInput.value = MUTED_COLORS[0];
+    renderColorSwatches('label-color-swatches', 'label-color-input');
+  });
+
+  document.getElementById('label-edit-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const id = document.getElementById('label-edit-form').dataset.labelId;
+    const name = document.getElementById('label-edit-name-input').value.trim();
+    if (!name) return;
+    const color = document.getElementById('label-edit-color-input').value || MUTED_COLORS[0];
+    await updateLabel(id, { name, color });
+    closeLabelEditModal();
+  });
+  document.getElementById('label-edit-cancel-btn').addEventListener('click', closeLabelEditModal);
+  document.getElementById('label-edit-modal').addEventListener('click', e => {
+    if (e.target.id === 'label-edit-modal') closeLabelEditModal();
+  });
 }
 
 function canNotify() {
@@ -830,6 +1115,11 @@ function setupForms() {
   document.getElementById('project-filter').addEventListener('change', e => {
     state.activeProjectId = e.target.value;
     render();
+    syncAddBarDefaultsFromFilters();
+  });
+
+  document.getElementById('task-project').addEventListener('change', () => {
+    taskProjectManuallySet = true;
   });
 
   document.getElementById('add-project-form').addEventListener('submit', e => {
@@ -868,6 +1158,8 @@ function setupForms() {
 
   setupAddressSearch();
   setupEditModal();
+  setupProjectEditModal();
+  setupLabelForms();
 }
 
 async function init() {
@@ -875,7 +1167,9 @@ async function init() {
   await rolloverAndPurge();
   await loadAll();
   renderColorSwatches();
+  renderColorSwatches('label-color-swatches', 'label-color-input');
   render();
+  syncAddBarDefaultsFromFilters();
   setupTabs();
   setupScopeToggle();
   setupForms();

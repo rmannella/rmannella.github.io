@@ -20,6 +20,7 @@
   <nav class="tabs">
     <button class="tab-btn tab-active" data-panel="panel-today">Today</button>
     <button class="tab-btn" data-panel="panel-projects">Projects</button>
+    <button class="tab-btn" data-panel="panel-labels">Labels</button>
     <button class="tab-btn" data-panel="panel-locations">Locations</button>
     <button class="tab-btn" data-panel="panel-settings">Settings</button>
   </nav>
@@ -67,6 +68,17 @@
       <button type="submit" class="primary-btn">Add</button>
     </form>
     <div id="projects-list" class="list"></div>
+  </section>
+
+  <section id="panel-labels" class="panel">
+    <h2>Labels</h2>
+    <form id="add-label-form" class="inline-form">
+      <input id="label-name-input" type="text" placeholder="Label name">
+      <div id="label-color-swatches" class="swatch-picker"></div>
+      <input type="hidden" id="label-color-input" value="">
+      <button type="submit" class="primary-btn">Add</button>
+    </form>
+    <div id="labels-list" class="list"></div>
   </section>
 
   <section id="panel-locations" class="panel">
@@ -162,6 +174,44 @@
         <button type="button" id="edit-delete-btn" class="danger-btn">Delete task</button>
         <div class="modal-actions-right">
           <button type="button" id="edit-cancel-btn" class="secondary-btn">Cancel</button>
+          <button type="submit" class="primary-btn">Save</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="project-edit-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <h2>Edit project</h2>
+    <form id="project-edit-form">
+      <label class="field-label">Name
+        <input id="project-edit-name-input" type="text" placeholder="Project name">
+      </label>
+      <div id="project-edit-color-swatches" class="swatch-picker"></div>
+      <input type="hidden" id="project-edit-color-input" value="">
+      <div class="modal-actions">
+        <div class="modal-actions-right">
+          <button type="button" id="project-edit-cancel-btn" class="secondary-btn">Cancel</button>
+          <button type="submit" class="primary-btn">Save</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="label-edit-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <h2>Edit label</h2>
+    <form id="label-edit-form">
+      <label class="field-label">Name
+        <input id="label-edit-name-input" type="text" placeholder="Label name">
+      </label>
+      <div id="label-edit-color-swatches" class="swatch-picker"></div>
+      <input type="hidden" id="label-edit-color-input" value="">
+      <div class="modal-actions">
+        <div class="modal-actions-right">
+          <button type="button" id="label-edit-cancel-btn" class="secondary-btn">Cancel</button>
           <button type="submit" class="primary-btn">Save</button>
         </div>
       </div>

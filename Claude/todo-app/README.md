@@ -57,7 +57,39 @@ is published — no separate CI workflow needed.
   instead of an open color picker, and the app's accent color was toned
   down to match.
 - Logo in the header, pulled from `/images/logo.png` (the same file the
-  main site uses) rather than duplicated into this folder.
+  main site uses) rather than duplicated into this folder — given a black
+  badge background since the artwork is white-on-transparent (designed for
+  the main site's black page background).
+- **Undo after deleting a task**: deleting shows a toast with an "Undo"
+  button for ~5.5s before the task is actually removed from IndexedDB —
+  undo just cancels the pending removal. Best-effort only: if the page
+  closes/reloads before the window elapses, the task survives (the delete
+  never committed).
+- **Edit a project's name/color** after creation, via the same ✎ pattern as
+  tasks.
+- **"Labels"**: priority tags are now a real entity (new `labels` IndexedDB
+  store, `{id, name, color}`) with their own tab — rename (cascades across
+  every task using that tag) and delete (removes it from every task), each
+  with a color from the same muted palette as projects. Tasks still store
+  tag *names* as plain strings (no data migration for existing tasks);
+  typing a brand-new tag name anywhere auto-creates its label entry.
+  Task-row and project-card tag badges are colored from the matching label.
+- **Project cards show their tags** as colored pill bubbles (the distinct
+  priority tags across that project's tasks), same badge component used on
+  task rows.
+- **NLP recognizes recurrence and project names**: "take vitamins every
+  day"/"...daily" creates a daily-recurring task (defaulting its due date
+  to today if no other date was given, since recurrence needs a base date
+  to regenerate from); "...for Hudson Ave" auto-assigns the task to an
+  *existing* project named "Hudson Ave" — it never creates a new project
+  from text.
+- **New tasks inherit the current Today-view filter**: the add-bar's
+  project/tag pickers now default to whatever project/tag the Today view
+  is currently filtered to (falling back to Personal/no-tag when the
+  filter is "All"), while still being manually overridable per task.
+  Precedence when a task is captured via NLP text: an explicit manual pick
+  in the add-bar picker wins, then an NLP-detected project match from the
+  text, then the filter-synced default.
 
 ## What's intentionally NOT implemented (needs real backend infra)
 
