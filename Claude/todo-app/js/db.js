@@ -1,6 +1,6 @@
 const DB_NAME = 'todoapp';
-const DB_VERSION = 1;
-const STORES = ['tasks', 'projects', 'locations', 'digests'];
+const DB_VERSION = 2;
+const STORES = ['tasks', 'projects', 'locations', 'digests', 'labels'];
 
 let dbPromise = null;
 
@@ -21,6 +21,9 @@ function openDb() {
       }
       if (!db.objectStoreNames.contains('digests')) {
         db.createObjectStore('digests', { keyPath: 'date' });
+      }
+      if (!db.objectStoreNames.contains('labels')) {
+        db.createObjectStore('labels', { keyPath: 'id' });
       }
     };
     req.onsuccess = () => resolve(req.result);

@@ -5,6 +5,23 @@ the branch/issue history). No build step: it's plain HTML/CSS/JS served
 directly from this folder, so it deploys automatically wherever this repo
 is published — no separate CI workflow needed.
 
+## Design system
+
+`css/styles.css` is built on a small token system (`:root`): a warm
+terracotta accent (chosen partly because it passes WCAG AA contrast on
+white, unlike the earlier dusty-blue accent), a spacing scale
+(`--space-1`…`--space-6`), a two-tier radius scale plus a pill constant,
+soft warm-tinted shadows, and shared transition timing tokens. Headings and
+content titles (task titles, project/label/location names) use a
+Georgia-led system serif stack for a warmer, more editorial feel; buttons,
+inputs, and other UI chrome stay on the system sans stack — no webfont is
+loaded, keeping the app's zero-extra-network-request, offline-first
+posture intact. Cards (`task-row`/`list-row`/`digest-panel`/modal/toast)
+are borderless with a soft shadow; functional controls (inputs, buttons,
+chips) keep a hairline border. Every interactive element has a hover,
+`:active` press-scale, and `:focus-visible` state — none of that existed
+before this pass.
+
 ## What's actually implemented
 
 - **Today view** with auto-rollover of overdue open tasks, and completed
@@ -57,7 +74,39 @@ is published — no separate CI workflow needed.
   instead of an open color picker, and the app's accent color was toned
   down to match.
 - Logo in the header, pulled from `/images/logo.png` (the same file the
-  main site uses) rather than duplicated into this folder.
+  main site uses) rather than duplicated into this folder — given a black
+  badge background since the artwork is white-on-transparent (designed for
+  the main site's black page background).
+- **Undo after deleting a task**: deleting shows a toast with an "Undo"
+  button for ~5.5s before the task is actually removed from IndexedDB —
+  undo just cancels the pending removal. Best-effort only: if the page
+  closes/reloads before the window elapses, the task survives (the delete
+  never committed).
+- **Edit a project's name/color** after creation, via the same ✎ pattern as
+  tasks.
+- **"Labels"**: priority tags are now a real entity (new `labels` IndexedDB
+  store, `{id, name, color}`) with their own tab — rename (cascades across
+  every task using that tag) and delete (removes it from every task), each
+  with a color from the same muted palette as projects. Tasks still store
+  tag *names* as plain strings (no data migration for existing tasks);
+  typing a brand-new tag name anywhere auto-creates its label entry.
+  Task-row and project-card tag badges are colored from the matching label.
+- **Project cards show their tags** as colored pill bubbles (the distinct
+  priority tags across that project's tasks), same badge component used on
+  task rows.
+- **NLP recognizes recurrence and project names**: "take vitamins every
+  day"/"...daily" creates a daily-recurring task (defaulting its due date
+  to today if no other date was given, since recurrence needs a base date
+  to regenerate from); "...for Hudson Ave" auto-assigns the task to an
+  *existing* project named "Hudson Ave" — it never creates a new project
+  from text.
+- **New tasks inherit the current Today-view filter**: the add-bar's
+  project/tag pickers now default to whatever project/tag the Today view
+  is currently filtered to (falling back to Personal/no-tag when the
+  filter is "All"), while still being manually overridable per task.
+  Precedence when a task is captured via NLP text: an explicit manual pick
+  in the add-bar picker wins, then an NLP-detected project match from the
+  text, then the filter-synced default.
 
 ## What's intentionally NOT implemented (needs real backend infra)
 

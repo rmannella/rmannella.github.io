@@ -118,6 +118,31 @@ function extractDateTime(text, now = new Date()) {
   return { due, cleaned };
 }
 
+function extractRecurrence(text) {
+  const re = /\b(every\s*day|everyday|daily)\b/i;
+  const m = text.match(re);
+  if (m) {
+    return { recurrence: { freq: 'daily' }, cleaned: text.replace(m[0], '').trim() };
+  }
+  return { recurrence: null, cleaned: text };
+}
+
+function escapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function extractProject(text, knownProjects) {
+  for (const p of knownProjects) {
+    const escaped = escapeRegExp(p.name);
+    const re = new RegExp(`\\bfor (?:the\\s+)?${escaped}\\b`, 'i');
+    const m = text.match(re);
+    if (m) {
+      return { project: p, cleaned: text.replace(m[0], '').trim() };
+    }
+  }
+  return { project: null, cleaned: text };
+}
+
 function splitTasks(text) {
   const parts = text
     .split(/,| and (?!the |a |some )/i)
@@ -126,7 +151,7 @@ function splitTasks(text) {
   return parts.length ? parts : [text.trim()];
 }
 
-function parseEntry(rawText, knownLocations = [], now = new Date()) {
+function parseEntry(rawText, knownLocations = [], knownProjects = [], now = new Date()) {
   let text = stripLeadPhrase(rawText.trim());
 
   const locResult = extractLocation(text, knownLocations);
@@ -135,13 +160,24 @@ function parseEntry(rawText, knownLocations = [], now = new Date()) {
   const dtResult = extractDateTime(text, now);
   text = dtResult.cleaned;
 
+  const recResult = extractRecurrence(text);
+  text = recResult.cleaned;
+
+  let due = dtResult.due;
+  if (recResult.recurrence && !due) due = new Date(now);
+
+  const projResult = extractProject(text, knownProjects);
+  text = projResult.cleaned;
+
   text = text.replace(/^to\s+/i, '').trim();
 
   const segments = splitTasks(text).map(s => s.replace(/^to\s+/i, '').trim()).filter(Boolean);
 
   return segments.map(title => ({
     title: capitalize(title),
-    due: dtResult.due,
+    due,
     locationLabel: locResult.label,
+    recurrence: recResult.recurrence,
+    projectMatch: projResult.project,
   }));
 }
