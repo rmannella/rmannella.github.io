@@ -5,6 +5,23 @@ the branch/issue history). No build step: it's plain HTML/CSS/JS served
 directly from this folder, so it deploys automatically wherever this repo
 is published — no separate CI workflow needed.
 
+## Design system
+
+`css/styles.css` is built on a small token system (`:root`): a warm
+terracotta accent (chosen partly because it passes WCAG AA contrast on
+white, unlike the earlier dusty-blue accent), a spacing scale
+(`--space-1`…`--space-6`), a two-tier radius scale plus a pill constant,
+soft warm-tinted shadows, and shared transition timing tokens. Headings and
+content titles (task titles, project/label/location names) use a
+Georgia-led system serif stack for a warmer, more editorial feel; buttons,
+inputs, and other UI chrome stay on the system sans stack — no webfont is
+loaded, keeping the app's zero-extra-network-request, offline-first
+posture intact. Cards (`task-row`/`list-row`/`digest-panel`/modal/toast)
+are borderless with a soft shadow; functional controls (inputs, buttons,
+chips) keep a hairline border. Every interactive element has a hover,
+`:active` press-scale, and `:focus-visible` state — none of that existed
+before this pass.
+
 ## What's actually implemented
 
 - **Today view** with auto-rollover of overdue open tasks, and completed
