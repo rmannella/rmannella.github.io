@@ -987,6 +987,107 @@ function setupVoiceCapture() {
   });
 }
 
+function setupRecordButton() {
+  const screen = document.getElementById('record-screen');
+  const btn = document.getElementById('record-btn');
+  const prompt = document.getElementById('record-prompt');
+  const transcriptEl = document.getElementById('record-transcript');
+  const typeLink = document.getElementById('record-type-link');
+  const typeForm = document.getElementById('record-type-form');
+  const typeInput = document.getElementById('record-type-input');
+
+  typeLink.addEventListener('click', () => {
+    typeForm.classList.remove('hidden');
+    typeLink.classList.add('hidden');
+    typeInput.focus();
+  });
+
+  typeForm.addEventListener('submit', e => {
+    e.preventDefault();
+    const value = typeInput.value.trim();
+    if (!value) return;
+    addTaskFromText(value);
+    typeInput.value = '';
+  });
+
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    screen.classList.add('no-voice');
+    prompt.textContent = "Voice isn't supported in this browser — type your task below.";
+    typeForm.classList.remove('hidden');
+    typeLink.classList.add('hidden');
+    return;
+  }
+
+  const recordRecognizer = new SpeechRecognition();
+  recordRecognizer.lang = 'en-US';
+  recordRecognizer.interimResults = true;
+  recordRecognizer.maxAlternatives = 1;
+
+  let isRecording = false;
+  let finalTranscript = '';
+
+  function startRecording() {
+    if (isRecording) return;
+    finalTranscript = '';
+    transcriptEl.textContent = '';
+    try {
+      recordRecognizer.start();
+    } catch (err) {
+      return;
+    }
+    isRecording = true;
+    screen.classList.add('recording');
+    prompt.textContent = 'Listening…';
+  }
+
+  function stopRecording() {
+    if (!isRecording) return;
+    isRecording = false;
+    recordRecognizer.stop();
+  }
+
+  btn.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    startRecording();
+  });
+  btn.addEventListener('pointerup', stopRecording);
+  btn.addEventListener('pointerleave', stopRecording);
+  btn.addEventListener('pointercancel', stopRecording);
+
+  recordRecognizer.addEventListener('result', e => {
+    let interim = '';
+    let final = '';
+    for (let i = 0; i < e.results.length; i++) {
+      const chunk = e.results[i][0].transcript;
+      if (e.results[i].isFinal) final += chunk;
+      else interim += chunk;
+    }
+    if (final) finalTranscript = final;
+    transcriptEl.textContent = finalTranscript || interim;
+  });
+
+  recordRecognizer.addEventListener('end', () => {
+    screen.classList.remove('recording');
+    prompt.textContent = 'Hold to add a task';
+    transcriptEl.textContent = '';
+    const captured = finalTranscript.trim();
+    finalTranscript = '';
+    if (captured) {
+      addTaskFromText(captured);
+      screen.classList.add('success');
+      setTimeout(() => screen.classList.remove('success'), 550);
+    }
+  });
+
+  recordRecognizer.addEventListener('error', () => {
+    isRecording = false;
+    screen.classList.remove('recording');
+    prompt.textContent = 'Hold to add a task';
+    transcriptEl.textContent = '';
+  });
+}
+
 function setupExportImport() {
   document.getElementById('export-btn').addEventListener('click', async () => {
     const data = await DB.exportAll();
@@ -1174,6 +1275,7 @@ async function init() {
   setupScopeToggle();
   setupForms();
   setupVoiceCapture();
+  setupRecordButton();
   setupExportImport();
   setupGeofencer();
 

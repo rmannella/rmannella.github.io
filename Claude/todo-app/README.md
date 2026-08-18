@@ -7,22 +7,36 @@ is published — no separate CI workflow needed.
 
 ## Design system
 
-`css/styles.css` is built on a small token system (`:root`): a warm
-terracotta accent (chosen partly because it passes WCAG AA contrast on
-white, unlike the earlier dusty-blue accent), a spacing scale
-(`--space-1`…`--space-6`), a two-tier radius scale plus a pill constant,
-soft warm-tinted shadows, and shared transition timing tokens. Headings and
-content titles (task titles, project/label/location names) use a
-Georgia-led system serif stack for a warmer, more editorial feel; buttons,
-inputs, and other UI chrome stay on the system sans stack — no webfont is
-loaded, keeping the app's zero-extra-network-request, offline-first
-posture intact. Cards (`task-row`/`list-row`/`digest-panel`/modal/toast)
-are borderless with a soft shadow; functional controls (inputs, buttons,
-chips) keep a hairline border. Every interactive element has a hover,
-`:active` press-scale, and `:focus-visible` state — none of that existed
-before this pass.
+`css/styles.css` is built on a small token system (`:root`): a sage-green
+accent, a dedicated muted-red `--record` token for the recording state
+(kept separate from `--danger` even though they currently share a value,
+since "live recording" and "destructive action" are different concerns), a
+spacing scale (`--space-1`…`--space-6`), a two-tier radius scale plus a
+pill constant, soft warm-tinted shadows, and shared transition timing
+tokens. Headings and content titles (task titles, project/label/location
+names) use a Georgia-led system serif stack for a warmer, more editorial
+feel; buttons, inputs, and other UI chrome stay on the system sans stack —
+no webfont is loaded, keeping the app's zero-extra-network-request,
+offline-first posture intact. Cards (`task-row`/`list-row`/`digest-panel`/
+modal/toast) are borderless with a soft shadow; functional controls
+(inputs, buttons, chips) keep a hairline border. Every interactive element
+has a hover, `:active` press-scale, and `:focus-visible` state.
 
 ## What's actually implemented
+
+- **Record — the default landing screen.** A large press-and-hold circle
+  (`#record-btn` in `index.html`, wired in `js/app.js`'s
+  `setupRecordButton()`) is now the app's front door: hold it, speak, let
+  go — the button turns a muted "on air" red with expanding ripple rings,
+  a pulsing REC badge, and a soundwave glyph swapped in for the mic icon
+  while held, then settles with a quick pulse back to idle once the task
+  is captured (confirmed via the same toast every other capture path
+  uses). It runs its own separate `SpeechRecognition` instance from the
+  legacy small mic button described below, so neither affects the other.
+  A de-emphasized "or type it" link reveals a plain text input for manual
+  entry — present, but visually secondary, since recording is the primary
+  flow now. Browsers without `SpeechRecognition` (e.g. iOS Safari) get the
+  manual field auto-expanded instead of a dead-end disabled circle.
 
 - **Today view** with auto-rollover of overdue open tasks, and completed
   tasks struck through until midnight, then archived (purged 30 days after
@@ -36,9 +50,11 @@ before this pass.
   ("tomorrow", "Friday", "in 2 hours", "at 3pm"), location phrases ("when I
   get home"), and multi-task splitting ("...take out the trash and call
   mom").
-- **Voice capture** via the browser's built-in `SpeechRecognition` API
-  (Chrome on Android supports this) — transcript is fed through the same
-  parser as text entry.
+- **Voice capture on the Today tab's quick-add bar** (the small mic icon
+  next to the text field, click-to-toggle rather than press-and-hold) via
+  the same `SpeechRecognition` API (Chrome on Android supports this) —
+  transcript is fed through the same parser as text entry. Kept as a
+  secondary path now that Record is the primary one.
 - **Named locations** with lat/lng (150m fixed radius, matches spec) and a
   **foreground geofence check** (`js/geofence.js`) that fires a
   notification when you enter a saved location's radius while the app is
