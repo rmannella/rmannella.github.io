@@ -399,16 +399,6 @@ select {
   padding: var(--space-6) 0;
 }
 
-.digest-panel {
-  margin-top: var(--space-5);
-  padding: var(--space-4);
-  background: var(--surface);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-card);
-  font-size: var(--text-sm);
-  color: var(--text-muted);
-}
-
 .inline-form {
   display: flex;
   gap: var(--space-2);
@@ -468,43 +458,6 @@ select {
 
 .file-label {
   cursor: pointer;
-}
-
-/* Scope toggle (Today / All tasks) */
-
-.scope-toggle {
-  display: flex;
-  gap: var(--space-2);
-  margin-bottom: var(--space-4);
-}
-
-.scope-btn {
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text-muted);
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-full);
-  font-family: var(--font-sans);
-  font-size: var(--text-sm);
-  font-weight: 500;
-  cursor: pointer;
-  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
-}
-
-.scope-btn:hover {
-  background: var(--accent-tint);
-  border-color: var(--accent);
-  color: var(--text);
-}
-
-.scope-btn:active {
-  transform: scale(0.96);
-}
-
-.scope-btn.scope-active {
-  background: var(--accent);
-  color: #fff;
-  border-color: var(--accent);
 }
 
 /* Drag handle + reorder */
@@ -872,7 +825,16 @@ select {
   animation: record-breathe 3.2s ease-in-out infinite;
   touch-action: none;
   -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
   user-select: none;
+}
+
+.record-btn:focus {
+  outline: none;
+}
+.record-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
 }
 
 .record-btn:hover {

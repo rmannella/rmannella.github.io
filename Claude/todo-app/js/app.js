@@ -7,7 +7,6 @@ const state = {
   labels: [],
   activeProjectId: 'all',
   activeTag: 'all',
-  scope: 'today',
 };
 
 let geofencer = null;
@@ -93,9 +92,11 @@ function isTaskVisible(t) {
   if (t.status === 'completed') {
     return t.completed_at && dateKey(new Date(t.completed_at)) === todayKey();
   }
-  if (state.scope === 'all') return true;
-  if (!t.due_date) return false;
-  return t.due_date <= todayKey();
+  return true;
+}
+
+function isPinnedToday(t) {
+  return !!t.due_date && t.due_date <= todayKey();
 }
 
 function taskMatchesFilters(t) {
@@ -394,7 +395,18 @@ function renderTaskList() {
     .filter(t => !pendingDelete || t.id !== pendingDelete.task.id)
     .filter(isTaskVisible)
     .filter(taskMatchesFilters);
-  const open = visible.filter(t => t.status !== 'completed').sort((a, b) => taskSortValue(a) - taskSortValue(b));
+  const open = visible.filter(t => t.status !== 'completed').sort((a, b) => {
+    const aPinned = isPinnedToday(a);
+    const bPinned = isPinnedToday(b);
+    if (aPinned !== bPinned) return aPinned ? -1 : 1;
+    if (aPinned) return taskSortValue(a) - taskSortValue(b);
+    if (a.due_date !== b.due_date) {
+      if (!a.due_date) return 1;
+      if (!b.due_date) return -1;
+      return a.due_date < b.due_date ? -1 : 1;
+    }
+    return taskSortValue(a) - taskSortValue(b);
+  });
   const done = visible
     .filter(t => t.status === 'completed')
     .sort((a, b) => new Date(b.completed_at) - new Date(a.completed_at));
@@ -482,22 +494,6 @@ function renderLocationsPanel() {
   });
 }
 
-async function renderDigest() {
-  const today = (await DB.get('digests', todayKey())) || { completed: 0, pushed: 0 };
-  document.getElementById('digest-today').textContent =
-    `Today: ${today.completed} completed, ${today.pushed} pushed`;
-
-  const days = [];
-  for (let i = 0; i < 7; i++) days.push(addDays(todayKey(), -i));
-  const entries = await Promise.all(days.map(d => DB.get('digests', d)));
-  const weekTotals = entries.reduce(
-    (acc, e) => ({ completed: acc.completed + (e ? e.completed : 0), pushed: acc.pushed + (e ? e.pushed : 0) }),
-    { completed: 0, pushed: 0 }
-  );
-  document.getElementById('digest-week').textContent =
-    `Last 7 days: ${weekTotals.completed} completed, ${weekTotals.pushed} pushed`;
-}
-
 function render() {
   renderProjectFilter();
   renderTagFilter();
@@ -507,7 +503,6 @@ function render() {
   renderProjectsPanel();
   renderLabelsPanel();
   renderLocationsPanel();
-  renderDigest();
 }
 
 async function addTaskFromText(rawText) {
@@ -1123,26 +1118,18 @@ function onLocationsTabShown() {
   setTimeout(invalidateLocationMap, 60);
 }
 
-function setupTabs() {
-  document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('tab-active'));
-      document.querySelectorAll('.panel').forEach(p => p.classList.remove('panel-active'));
-      btn.classList.add('tab-active');
-      document.getElementById(btn.dataset.panel).classList.add('panel-active');
-      if (btn.dataset.panel === 'panel-locations') onLocationsTabShown();
-    });
-  });
+function activateTab(panelId) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('tab-active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('panel-active'));
+  const btn = document.querySelector(`.tab-btn[data-panel="${panelId}"]`);
+  if (btn) btn.classList.add('tab-active');
+  document.getElementById(panelId).classList.add('panel-active');
+  if (panelId === 'panel-locations') onLocationsTabShown();
 }
 
-function setupScopeToggle() {
-  document.querySelectorAll('.scope-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.scope-btn').forEach(b => b.classList.remove('scope-active'));
-      btn.classList.add('scope-active');
-      state.scope = btn.dataset.scope;
-      render();
-    });
+function setupTabs() {
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => activateTab(btn.dataset.panel));
   });
 }
 
@@ -1272,7 +1259,6 @@ async function init() {
   render();
   syncAddBarDefaultsFromFilters();
   setupTabs();
-  setupScopeToggle();
   setupForms();
   setupVoiceCapture();
   setupRecordButton();
