@@ -19,7 +19,7 @@
   </div>
   <nav class="tabs">
     <button class="tab-btn tab-active" data-panel="panel-record">Record</button>
-    <button class="tab-btn" data-panel="panel-today">Today</button>
+    <button class="tab-btn" data-panel="panel-today">Tasks</button>
     <button class="tab-btn" data-panel="panel-projects">Projects</button>
     <button class="tab-btn" data-panel="panel-labels">Labels</button>
     <button class="tab-btn" data-panel="panel-locations">Locations</button>
@@ -58,11 +58,7 @@
       </div>
       <p class="record-prompt" id="record-prompt">Hold to add a task</p>
       <p class="record-transcript" id="record-transcript"></p>
-      <div class="record-links">
-        <button type="button" class="record-type-link" id="record-type-link">or type it</button>
-        <span class="record-links-sep" id="record-links-sep">·</span>
-        <button type="button" class="record-view-link" id="record-view-link">View tasks</button>
-      </div>
+      <button type="button" class="record-type-link" id="record-type-link">or type it</button>
       <form id="record-type-form" class="record-type-form hidden">
         <input type="text" id="record-type-input" placeholder="Type a task…" autocomplete="off">
         <button type="submit" class="primary-btn">Add</button>
@@ -71,7 +67,13 @@
   </section>
 
   <section id="panel-today" class="panel">
-    <h2>Today</h2>
+    <h2>Tasks</h2>
+
+    <div class="filters">
+      <select id="project-filter"></select>
+      <div id="tag-filter" class="chip-row"></div>
+    </div>
+
     <form id="add-task-form" class="add-task-form">
       <input id="task-input" type="text" placeholder='e.g. "remind me when I get home to take out the trash and call mom"' autocomplete="off">
       <button type="button" id="mic-btn" class="icon-btn mic-btn" title="Voice input">🎤</button>
@@ -84,23 +86,8 @@
       <select id="task-location"></select>
     </div>
 
-    <div class="scope-toggle">
-      <button type="button" class="scope-btn scope-active" data-scope="today">Today</button>
-      <button type="button" class="scope-btn" data-scope="all">All tasks</button>
-    </div>
-
-    <div class="filters">
-      <select id="project-filter"></select>
-      <div id="tag-filter" class="chip-row"></div>
-    </div>
-
     <div id="task-list-open" class="task-list"></div>
     <div id="task-list-done" class="task-list task-list-done"></div>
-
-    <div class="digest-panel">
-      <div id="digest-today"></div>
-      <div id="digest-week"></div>
-    </div>
   </section>
 
   <section id="panel-projects" class="panel">

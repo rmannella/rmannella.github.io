@@ -17,8 +17,8 @@ tokens. Headings and content titles (task titles, project/label/location
 names) use a Georgia-led system serif stack for a warmer, more editorial
 feel; buttons, inputs, and other UI chrome stay on the system sans stack —
 no webfont is loaded, keeping the app's zero-extra-network-request,
-offline-first posture intact. Cards (`task-row`/`list-row`/`digest-panel`/
-modal/toast) are borderless with a soft shadow; functional controls
+offline-first posture intact. Cards (`task-row`/`list-row`/modal/toast) are
+borderless with a soft shadow; functional controls
 (inputs, buttons, chips) keep a hairline border. Every interactive element
 has a hover, `:active` press-scale, and `:focus-visible` state.
 
@@ -36,14 +36,15 @@ has a hover, `:active` press-scale, and `:focus-visible` state.
   A de-emphasized "or type it" link reveals a plain text input for manual
   entry — present, but visually secondary, since recording is the primary
   flow now. Browsers without `SpeechRecognition` (e.g. iOS Safari) get the
-  manual field auto-expanded instead of a dead-end disabled circle. A
-  "View tasks" link next to it jumps straight to the Today tab, since the
-  Record screen itself has no task list — this is the only way back to
-  seeing what you've captured.
+  manual field auto-expanded instead of a dead-end disabled circle.
 
-- **Today view** with auto-rollover of overdue open tasks, and completed
-  tasks struck through until midnight, then archived (purged 30 days after
-  completion) — all via `js/app.js` + IndexedDB (`js/db.js`).
+- **Tasks tab** (formerly "Today") shows every open task in one list —
+  today's and overdue tasks are pinned to the top, everything else follows
+  sorted by due date ascending (undated tasks last). Auto-rollover keeps
+  overdue open tasks pinned at the top day after day, and completed tasks
+  stay struck through until midnight, then archive (purged 30 days after
+  completion) — all via `js/app.js` + IndexedDB (`js/db.js`). Project/tag
+  filters sit at the top of the panel, above the add-task bar.
 - **Projects** ("Personal" as default) and **custom priority tags**,
   filterable.
 - **Push to tomorrow** (→) per task.
@@ -53,7 +54,7 @@ has a hover, `:active` press-scale, and `:focus-visible` state.
   ("tomorrow", "Friday", "in 2 hours", "at 3pm"), location phrases ("when I
   get home"), and multi-task splitting ("...take out the trash and call
   mom").
-- **Voice capture on the Today tab's quick-add bar** (the small mic icon
+- **Voice capture on the Tasks tab's quick-add bar** (the small mic icon
   next to the text field, click-to-toggle rather than press-and-hold) via
   the same `SpeechRecognition` API (Chrome on Android supports this) —
   transcript is fed through the same parser as text entry. Kept as a
@@ -65,8 +66,10 @@ has a hover, `:active` press-scale, and `:focus-visible` state.
 - **Time-based notifications** for tasks with a due time, checked locally.
 - **Offline support**: all data lives in IndexedDB; the service worker
   (`sw.js`) caches the app shell so the whole app loads with no network.
-- **Daily/weekly digest**: completed vs. pushed counts, computed from local
-  history.
+- **Daily/weekly digest tracking**: completed vs. pushed counts are still
+  recorded per day (`digests` IndexedDB store, `bumpDigest()`), but there's
+  no digest panel in the UI anymore — the data's kept for potential future
+  surfacing.
 - **Manual export/import** (Settings tab) as a JSON file — a practical
   stopgap for moving data between devices by hand.
 - Installable PWA (`manifest.webmanifest`).
@@ -76,11 +79,11 @@ has a hover, `:active` press-scale, and `:focus-visible` state.
 - **Manual drag-to-reorder** of open tasks (drag the ⠿ handle), backed by
   [SortableJS](https://github.com/SortableJS/Sortable) and a `sort_order`
   field on each task. Completed tasks stay pinned below and aren't
-  reorderable.
-- **Today vs. All tasks scope toggle** — Today only shows tasks due today
-  or overdue (undated, location-only tasks are intentionally excluded);
-  "All tasks" shows every open task regardless of due date, which is where
-  those location-only tasks live until they're given a date.
+  reorderable. Since due-today/overdue tasks are always pinned above
+  everything else, dragging only meaningfully reorders *within* that
+  pinned group — dragging a not-yet-due task around doesn't change its
+  position, since the due-date sort below the pinned group takes
+  precedence over `sort_order` there.
 - **Address search and map pin** for locations, via
   [Leaflet](https://leafletjs.com/) (map/pin UI) and
   [OpenStreetMap Nominatim](https://nominatim.org/) (free geocoding, no API
@@ -119,8 +122,8 @@ has a hover, `:active` press-scale, and `:focus-visible` state.
   to regenerate from); "...for Hudson Ave" auto-assigns the task to an
   *existing* project named "Hudson Ave" — it never creates a new project
   from text.
-- **New tasks inherit the current Today-view filter**: the add-bar's
-  project/tag pickers now default to whatever project/tag the Today view
+- **New tasks inherit the current Tasks-view filter**: the add-bar's
+  project/tag pickers now default to whatever project/tag the Tasks view
   is currently filtered to (falling back to Personal/no-tag when the
   filter is "All"), while still being manually overridable per task.
   Precedence when a task is captured via NLP text: an explicit manual pick
@@ -162,7 +165,11 @@ Drag-to-reorder renumbers `sort_order` only for the tasks currently visible
 (after project/tag filtering). If you reorder while a filter is active, the
 new order is relative to that filtered set — clearing the filter afterward
 can interleave those tasks with others in a way that isn't perfectly
-predictable. Reordering with no filter active avoids this entirely.
+predictable. Reordering with no filter active avoids this entirely. Separately,
+`sort_order` itself now only determines order within the pinned
+today/overdue group at the top of the list — tasks below that are always
+ordered by due date, so dragging one of them has no visible effect after
+the next render.
 
 ## Running locally
 
