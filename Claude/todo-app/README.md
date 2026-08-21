@@ -36,7 +36,10 @@ has a hover, `:active` press-scale, and `:focus-visible` state.
   A de-emphasized "or type it" link reveals a plain text input for manual
   entry — present, but visually secondary, since recording is the primary
   flow now. Browsers without `SpeechRecognition` (e.g. iOS Safari) get the
-  manual field auto-expanded instead of a dead-end disabled circle.
+  manual field auto-expanded instead of a dead-end disabled circle. A
+  "View tasks" link next to it jumps straight to the Today tab, since the
+  Record screen itself has no task list — this is the only way back to
+  seeing what you've captured.
 
 - **Today view** with auto-rollover of overdue open tasks, and completed
   tasks struck through until midnight, then archived (purged 30 days after

@@ -58,7 +58,11 @@
       </div>
       <p class="record-prompt" id="record-prompt">Hold to add a task</p>
       <p class="record-transcript" id="record-transcript"></p>
-      <button type="button" class="record-type-link" id="record-type-link">or type it</button>
+      <div class="record-links">
+        <button type="button" class="record-type-link" id="record-type-link">or type it</button>
+        <span class="record-links-sep" id="record-links-sep">·</span>
+        <button type="button" class="record-view-link" id="record-view-link">View tasks</button>
+      </div>
       <form id="record-type-form" class="record-type-form hidden">
         <input type="text" id="record-type-input" placeholder="Type a task…" autocomplete="off">
         <button type="submit" class="primary-btn">Add</button>

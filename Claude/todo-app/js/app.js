@@ -995,12 +995,16 @@ function setupRecordButton() {
   const typeLink = document.getElementById('record-type-link');
   const typeForm = document.getElementById('record-type-form');
   const typeInput = document.getElementById('record-type-input');
+  const viewLink = document.getElementById('record-view-link');
+  const linksSep = document.getElementById('record-links-sep');
 
   typeLink.addEventListener('click', () => {
     typeForm.classList.remove('hidden');
     typeLink.classList.add('hidden');
     typeInput.focus();
   });
+
+  viewLink.addEventListener('click', () => activateTab('panel-today'));
 
   typeForm.addEventListener('submit', e => {
     e.preventDefault();
@@ -1016,6 +1020,7 @@ function setupRecordButton() {
     prompt.textContent = "Voice isn't supported in this browser — type your task below.";
     typeForm.classList.remove('hidden');
     typeLink.classList.add('hidden');
+    linksSep.classList.add('hidden');
     return;
   }
 
@@ -1123,15 +1128,18 @@ function onLocationsTabShown() {
   setTimeout(invalidateLocationMap, 60);
 }
 
+function activateTab(panelId) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('tab-active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('panel-active'));
+  const btn = document.querySelector(`.tab-btn[data-panel="${panelId}"]`);
+  if (btn) btn.classList.add('tab-active');
+  document.getElementById(panelId).classList.add('panel-active');
+  if (panelId === 'panel-locations') onLocationsTabShown();
+}
+
 function setupTabs() {
   document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('tab-active'));
-      document.querySelectorAll('.panel').forEach(p => p.classList.remove('panel-active'));
-      btn.classList.add('tab-active');
-      document.getElementById(btn.dataset.panel).classList.add('panel-active');
-      if (btn.dataset.panel === 'panel-locations') onLocationsTabShown();
-    });
+    btn.addEventListener('click', () => activateTab(btn.dataset.panel));
   });
 }
 

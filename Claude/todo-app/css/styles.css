@@ -872,7 +872,16 @@ select {
   animation: record-breathe 3.2s ease-in-out infinite;
   touch-action: none;
   -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
   user-select: none;
+}
+
+.record-btn:focus {
+  outline: none;
+}
+.record-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
 }
 
 .record-btn:hover {
@@ -929,8 +938,15 @@ select {
   min-height: 1.2em;
 }
 
-.record-type-link {
+.record-links {
   margin-top: var(--space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.record-type-link,
+.record-view-link {
   background: none;
   border: none;
   padding: 0;
@@ -941,12 +957,18 @@ select {
   cursor: pointer;
 }
 
-.record-type-link:hover {
+.record-type-link:hover,
+.record-view-link:hover {
   color: var(--accent-strong);
 }
 
 .record-type-link.hidden {
   display: none;
+}
+
+.record-links-sep {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
 }
 
 .record-type-form {
