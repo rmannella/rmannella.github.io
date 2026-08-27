@@ -13,6 +13,8 @@ let sortableInstance = null;
 let locationMapInitialized = false;
 let toastTimer = null;
 let pendingDelete = null;
+let editingTaskId = null;
+let titleClickTimer = null;
 
 function dateKey(d) {
   const y = d.getFullYear();
@@ -251,6 +253,29 @@ function renderColorSwatches(wrapId = 'label-color-swatches', hiddenInputId = 'l
   });
 }
 
+function startInlineTitleEdit(id) {
+  editingTaskId = id;
+  renderTaskList();
+}
+
+function cancelInlineTitleEdit() {
+  editingTaskId = null;
+  renderTaskList();
+}
+
+async function saveInlineTitleEdit(id, value) {
+  editingTaskId = null;
+  const t = state.tasks.find(t => t.id === id);
+  const trimmed = value.trim();
+  if (t && trimmed && trimmed !== t.title) {
+    t.title = trimmed;
+    t.updated_at = new Date().toISOString();
+    await DB.put('tasks', t);
+    await loadAll();
+  }
+  render();
+}
+
 function taskRow(t, draggable) {
   const row = el('div', 'task-row' + (t.status === 'completed' ? ' task-done' : ''));
   row.dataset.id = t.id;
@@ -271,26 +296,59 @@ function taskRow(t, draggable) {
     row.appendChild(dot);
   });
 
-  row.appendChild(el('span', 'task-title', t.title));
+  const content = el('div', 'task-content');
 
-  const isOverdue = !!t.due_date && t.due_date < todayKey() && t.status === 'open';
-  const isToday = t.due_date === todayKey();
-  const bits = [];
-  if (fmtDue(t)) bits.push(fmtDue(t));
-  const loc = locationLabel(t.location_trigger_id);
-  if (loc) bits.push(`📍 ${loc}`);
-  if (t.recurrence_rule) bits.push('🔁');
-  if (bits.length) {
-    row.appendChild(el('span', 'task-sep', '·'));
-    const metaClass = 'task-meta-inline' + (isOverdue ? ' overdue' : isToday ? ' today' : '');
-    row.appendChild(el('span', metaClass, bits.join(' · ')));
+  if (editingTaskId === t.id) {
+    const input = el('input');
+    input.type = 'text';
+    input.className = 'task-title-input';
+    input.value = t.title;
+    content.appendChild(input);
+    requestAnimationFrame(() => {
+      input.focus();
+      input.select();
+    });
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        input.blur();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        cancelInlineTitleEdit();
+      }
+    });
+    input.addEventListener('blur', () => {
+      if (editingTaskId === t.id) saveInlineTitleEdit(t.id, input.value);
+    });
+  } else {
+    const titleEl = el('span', 'task-title', t.title);
+    titleEl.addEventListener('click', () => {
+      clearTimeout(titleClickTimer);
+      titleClickTimer = setTimeout(() => startInlineTitleEdit(t.id), 250);
+    });
+    titleEl.addEventListener('dblclick', () => {
+      clearTimeout(titleClickTimer);
+      openEditModal(t.id);
+    });
+    content.appendChild(titleEl);
+
+    const isOverdue = !!t.due_date && t.due_date < todayKey() && t.status === 'open';
+    const isToday = t.due_date === todayKey();
+    const bits = [];
+    if (fmtDue(t)) bits.push(fmtDue(t));
+    const loc = locationLabel(t.location_trigger_id);
+    if (loc) bits.push(`📍 ${loc}`);
+    if (t.recurrence_rule) bits.push('🔁');
+    if (bits.length) {
+      content.appendChild(el('span', 'task-sep', '·'));
+      const metaClass = 'task-meta-inline' + (isOverdue ? ' overdue' : isToday ? ' today' : '');
+      content.appendChild(el('span', metaClass, bits.join(' · ')));
+    }
   }
 
+  row.appendChild(content);
+
   const actions = el('div', 'task-actions');
-  const editBtn = el('button', 'icon-btn', '✎');
-  editBtn.title = 'Edit';
-  editBtn.addEventListener('click', () => openEditModal(t.id));
-  actions.appendChild(editBtn);
 
   if (t.status !== 'completed') {
     const pushBtn = el('button', 'icon-btn', '→');

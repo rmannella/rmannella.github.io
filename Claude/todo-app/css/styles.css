@@ -410,7 +410,7 @@ select {
 
 .task-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--space-2);
   background: var(--surface);
   border-radius: var(--radius-md);
@@ -439,6 +439,7 @@ select {
   accent-color: var(--accent);
   cursor: pointer;
   flex-shrink: 0;
+  margin-top: 3px;
 }
 
 .tag-dot {
@@ -447,30 +448,37 @@ select {
   border-radius: 50%;
   flex-shrink: 0;
   display: inline-block;
+  margin-top: 8px;
+}
+
+.task-content {
+  flex: 1;
+  min-width: 0;
 }
 
 .task-title {
   font-family: var(--font-serif);
   font-size: var(--text-base);
   color: var(--text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
-  flex-shrink: 1;
+  line-height: 1.4;
+  cursor: text;
 }
 
 .task-sep {
   color: var(--border);
   font-size: var(--text-sm);
-  flex-shrink: 0;
+  margin: 0 var(--space-1);
 }
 
 .task-meta-inline {
   font-size: var(--text-sm);
   color: var(--text-muted);
-  white-space: nowrap;
-  flex-shrink: 0;
+}
+
+.task-title-input {
+  font-family: var(--font-serif);
+  width: 100%;
+  padding: var(--space-1) var(--space-2);
 }
 
 .task-meta-inline.overdue {

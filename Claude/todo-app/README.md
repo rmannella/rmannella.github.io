@@ -57,9 +57,10 @@ press-scale, and `:focus-visible` state.
 
 - **Settings lives behind a gear icon** in the top-right of the header
   (`#settings-gear-btn`), not a tab — it's a separate concern from
-  Record/Tasks, the app's two main views. **Locations** and **Labels**
+  Record/Tasks, the app's two main views. **Labels** and **Locations**
   management (previously their own tabs) are now sub-sections inside
-  Settings, along with notifications, export/import, and a new
+  Settings — Labels first, since it's the more frequently used of the
+  two — along with notifications, export/import, and a new
   **default task time** field (see below).
 
 - **Projects have been removed.** The app now organizes tasks with
@@ -114,8 +115,12 @@ press-scale, and `:focus-visible` state.
 - **Manual export/import** (Settings) as a JSON file — a practical
   stopgap for moving data between devices by hand.
 - Installable PWA (`manifest.webmanifest`).
-- **Edit any task** after adding it (title, tags, due date/time, location
-  trigger, recurrence) via the ✎ button, which opens an edit sheet.
+- **Editing a task**: click its title to rename it in place (an inline
+  text input replaces the title, saved on blur/Enter, discarded on
+  Escape); double-click the title to open the full edit sheet instead
+  (tags, due date/time, location trigger, recurrence). There's no
+  separate edit button anymore. Task titles wrap onto multiple lines
+  rather than truncating with an ellipsis.
 - **Manual drag-to-reorder** of open tasks (drag the ⠿ handle), backed by
   [SortableJS](https://github.com/SortableJS/Sortable) and a `sort_order`
   field on each task. Completed tasks stay pinned below and aren't
