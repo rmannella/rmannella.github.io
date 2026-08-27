@@ -51,6 +51,7 @@ async function bumpDigest(field) {
   const key = todayKey();
   const existing = (await DB.get('digests', key)) || { date: key, completed: 0, pushed: 0 };
   existing[field] += 1;
+  existing.updated_at = new Date().toISOString();
   await DB.put('digests', existing);
 }
 
@@ -479,7 +480,7 @@ function render() {
 
 async function resolveInferredLocation(locationLabelObj) {
   if (!locationLabelObj || locationLabelObj.id || !locationLabelObj.inferred) return null;
-  const loc = { id: uid(), label: locationLabelObj.label, lat: null, lng: null };
+  const loc = { id: uid(), label: locationLabelObj.label, lat: null, lng: null, updated_at: new Date().toISOString() };
   await DB.put('locations', loc);
   state.locations.push(loc);
   return loc.id;
@@ -752,7 +753,7 @@ async function saveEditModal() {
 
 async function addLocation({ label, lat, lng }) {
   if (!label || Number.isNaN(lat) || Number.isNaN(lng)) return;
-  await DB.put('locations', { id: uid(), label, lat, lng });
+  await DB.put('locations', { id: uid(), label, lat, lng, updated_at: new Date().toISOString() });
   await loadAll();
   render();
 }
@@ -772,7 +773,7 @@ async function deleteLocation(id) {
 async function putLabelQuiet(name, color) {
   const existing = labelByName(name);
   if (existing) return existing;
-  const label = { id: uid(), name: name.trim(), color };
+  const label = { id: uid(), name: name.trim(), color, updated_at: new Date().toISOString() };
   await DB.put('labels', label);
   state.labels.push(label);
   return label;
@@ -798,6 +799,7 @@ async function updateLabel(id, { name, color }) {
   const oldName = label.name;
   label.name = name;
   label.color = color;
+  label.updated_at = new Date().toISOString();
   await DB.put('labels', label);
   if (oldName.toLowerCase() !== name.toLowerCase()) {
     const affected = state.tasks.filter(t =>

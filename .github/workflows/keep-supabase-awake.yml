@@ -1,0 +1,26 @@
+name: Keep Supabase Awake
+
+on:
+  schedule:
+    - cron: '0 12 */3 * *' # every 3 days, well under the ~7-day free-tier pause window
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST API
+        run: |
+          if [ -z "${{ secrets.SUPABASE_URL }}" ] || [ -z "${{ secrets.SUPABASE_ANON_KEY }}" ]; then
+            echo "SUPABASE_URL / SUPABASE_ANON_KEY secrets not set yet — nothing to ping, skipping."
+            exit 0
+          fi
+          status=$(curl -sS -o /dev/null -w "%{http_code}" \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/tasks?select=id&limit=1" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}")
+          echo "status=$status"
+          case "$status" in
+            200|206) exit 0 ;;
+            *) exit 1 ;;
+          esac

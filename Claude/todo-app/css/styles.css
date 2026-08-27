@@ -329,6 +329,10 @@ select {
   transform: scale(0.96);
 }
 
+.secondary-btn.hidden {
+  display: none;
+}
+
 .icon-btn {
   border: 1px solid var(--border);
   background: var(--surface);

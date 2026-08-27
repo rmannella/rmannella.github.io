@@ -177,34 +177,91 @@ press-scale, and `:focus-visible` state.
   to (blank when the filter is "All labels"), while still being manually
   overridable per task.
 
-## What's intentionally NOT implemented (needs real backend infra)
+## Cross-device sync (Supabase + Google sign-in)
 
-The spec calls for a cloud backend (Supabase/Firebase), Google OAuth, and
-real cross-device sync. None of that can be wired up without live project
-credentials, so this version stores everything **locally on-device only** —
-there is no account and no sync between your phone and computer yet.
-Nothing here blocks adding it later; the storage layer (`js/db.js`) is
-intentionally isolated so it could be swapped for a Supabase-backed
-implementation behind the same `DB.getAll/get/put/remove` interface.
+The app is local-first by default (IndexedDB only, no account) — that
+keeps working exactly as before if you never touch this. Optionally, you
+can turn on real cross-device sync: sign in with Google, and your tasks,
+labels, and locations sync to a free Supabase project and back down to
+every other device you sign into.
 
-Also out of scope for the same reason (needs a server):
+**How it's built:** `js/sync.js` is a self-contained layer that wraps
+`DB.put`/`DB.remove` (defined in `js/db.js`, which is never itself
+modified) to push local writes to Supabase, pulls and merges remote
+changes on sign-in, and subscribes to Supabase Realtime so changes from
+other devices show up without a manual refresh. It is **completely inert**
+until you configure it — `js/sync-config.js` ships with blank
+`url`/`anonKey` placeholders, and every sync function checks
+`isConfigured()` first and no-ops if it's not set. Conflicts (the same
+record edited on two devices) are resolved last-write-wins by an
+`updated_at` timestamp; deletes use a soft-delete tombstone
+(`deleted_at`) rather than a hard remove, so an offline device can't
+accidentally resurrect something another device already deleted once it
+reconnects. A local delete that fails to reach Supabase (offline, or a
+transient error) queues in `localStorage` and retries automatically on
+the next sync or when the browser comes back online.
+
+**Setting it up** (all of this is one-time, done by you in a couple of
+dashboards — none of it can be automated from here):
+
+1. Create a free project at [supabase.com](https://supabase.com).
+2. Open the SQL Editor and run everything in
+   [`supabase-schema.sql`](./supabase-schema.sql) (in this folder) —
+   creates the four tables (`tasks`, `locations`, `labels`, `digests`)
+   with Row Level Security so each signed-in user only ever sees their
+   own rows.
+3. Note the OAuth callback URL shown on Authentication → Providers:
+   `https://<project-ref>.supabase.co/auth/v1/callback`.
+4. In the [Google Cloud Console](https://console.cloud.google.com/):
+   create or pick a project → APIs & Services → OAuth consent screen
+   (External; add yourself as a test user if it's left in "Testing") →
+   Credentials → Create Credentials → OAuth client ID → Web application →
+   Authorized redirect URIs = the URL from step 3. Copy the Client ID and
+   Client Secret it gives you.
+5. Back in Supabase → Authentication → Providers → Google: enable it,
+   paste the Client ID/Secret, Save.
+6. Supabase → Authentication → URL Configuration → Redirect URLs: add the
+   deployed app's URL (e.g. `https://rachelmannella.com/Claude/todo-app/`).
+7. Supabase → Project Settings → API: copy the **Project URL** and the
+   **anon public** key (never the `service_role` key — that one must
+   never appear in client-side code).
+8. Paste those two values into `js/sync-config.js`'s `url`/`anonKey`
+   fields and deploy (commit + push, same as any other change here).
+9. In this GitHub repo → Settings → Secrets and variables → Actions: add
+   `SUPABASE_URL` and `SUPABASE_ANON_KEY` repo secrets with the same two
+   values — these feed the keep-alive workflow below. (Not sensitive:
+   the anon key is already public in the deployed `sync-config.js` — RLS
+   is what actually protects your data, not the key's secrecy.)
+10. Open the app → Settings → "Sign in with Google" → complete the
+    consent screen → confirm you land back signed in.
+11. Repeat sign-in with the same Google account on a second device;
+    confirm your existing tasks appear there, and that new edits show up
+    on both sides.
+
+**Free-tier auto-pause**: Supabase pauses free projects after about a
+week with no activity. `.github/workflows/keep-supabase-awake.yml` pings
+the project's REST API every 3 days (via `workflow_dispatch`-triggerable
+GitHub Actions cron) to keep that from happening — it's a no-op until you
+add the two repo secrets in step 9 above.
+
+## What's intentionally NOT implemented (needs infra beyond this app)
 
 - **True background push notifications.** `Notification`/`showNotification`
   here only fire while the app (tab or installed PWA) is open or recently
   active — there's no push server sending Web Push messages, so nothing
-  wakes the app when it's fully closed. Real background delivery needs a
-  backend with VAPID keys and a push subscription per device.
+  wakes the app when it's fully closed. Real background delivery needs
+  VAPID keys and a push subscription per device, wired through a backend
+  (Supabase Edge Functions could host this later, but it isn't built).
 - **Background geofencing.** The location check in `js/geofence.js` uses
   `watchPosition`, which only runs while the page is open. Real
   arrive-and-notify-even-when-closed behavior needs either a native
   wrapper or server-side geofence evaluation triggered by periodic
-  background sync — both require backend work.
+  background sync — both require more backend work than a Postgres table.
 - **AI-based NL/voice extraction.** The parser in `js/nlp.js` is a
   regex/heuristic approximation of the spec's "voice → AI model → structured
   task" pipeline, good enough to demo the UX but not as robust as an actual
   LLM call. It's structured so a `parseEntry()` call could be replaced with
   a fetch to a real parsing endpoint later.
-- **Google OAuth / accounts.**
 
 ## Known limitation: reordering under an active filter
 
