@@ -2,10 +2,8 @@ const MUTED_COLORS = ['#6c8ead', '#8a9a7b', '#b98d6f', '#a97c92', '#7c9c96', '#c
 
 const state = {
   tasks: [],
-  projects: [],
   locations: [],
   labels: [],
-  activeProjectId: 'all',
   activeTag: 'all',
 };
 
@@ -15,7 +13,6 @@ let sortableInstance = null;
 let locationMapInitialized = false;
 let toastTimer = null;
 let pendingDelete = null;
-let taskProjectManuallySet = false;
 
 function dateKey(d) {
   const y = d.getFullYear();
@@ -34,6 +31,12 @@ function addDays(dateStr, n) {
   return dateKey(d);
 }
 
+function getDefaultTaskTime() {
+  const v = localStorage.getItem('defaultTaskTime') || '09:00';
+  const [hour, minute] = v.split(':').map(Number);
+  return { hour: hour || 9, minute: minute || 0 };
+}
+
 async function bumpDigest(field) {
   const key = todayKey();
   const existing = (await DB.get('digests', key)) || { date: key, completed: 0, pushed: 0 };
@@ -41,16 +44,8 @@ async function bumpDigest(field) {
   await DB.put('digests', existing);
 }
 
-async function ensureDefaultProject() {
-  const projects = await DB.getAll('projects');
-  if (!projects.some(p => p.id === 'personal')) {
-    await DB.put('projects', { id: 'personal', name: 'Personal', color: MUTED_COLORS[0] });
-  }
-}
-
 async function loadAll() {
   state.tasks = await DB.getAll('tasks');
-  state.projects = await DB.getAll('projects');
   state.locations = await DB.getAll('locations');
   state.labels = await DB.getAll('labels');
 }
@@ -100,7 +95,6 @@ function isPinnedToday(t) {
 }
 
 function taskMatchesFilters(t) {
-  if (state.activeProjectId !== 'all' && (t.project_id || 'personal') !== state.activeProjectId) return false;
   if (state.activeTag !== 'all' && !(t.priority_tags || []).includes(state.activeTag)) return false;
   return true;
 }
@@ -116,14 +110,6 @@ function allPriorityTags() {
   return Array.from(tags).sort();
 }
 
-function sortedProjects() {
-  return [...state.projects].sort((a, b) => {
-    if (a.id === 'personal') return -1;
-    if (b.id === 'personal') return 1;
-    return a.name.localeCompare(b.name);
-  });
-}
-
 function sortedLocations() {
   return [...state.locations].sort((a, b) => a.label.localeCompare(b.label));
 }
@@ -136,46 +122,14 @@ function labelByName(name) {
   return state.labels.find(l => l.name.toLowerCase() === name.toLowerCase());
 }
 
-function hexToRgba(hex, alpha) {
-  const h = hex.replace('#', '');
-  const r = parseInt(h.substring(0, 2), 16);
-  const g = parseInt(h.substring(2, 4), 16);
-  const b = parseInt(h.substring(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
-
 function tagColor(tagName) {
   const l = labelByName(tagName);
   return l ? l.color : null;
 }
 
-function tagBadge(tagName) {
-  const badge = el('span', 'tag-badge', tagName);
-  const color = tagColor(tagName);
-  if (color) {
-    badge.style.background = hexToRgba(color, 0.18);
-    badge.style.color = color;
-  }
-  return badge;
-}
-
-function projectName(id) {
-  const p = state.projects.find(p => p.id === (id || 'personal'));
-  return p ? p.name : 'Personal';
-}
-
 function locationLabel(id) {
   const l = state.locations.find(l => l.id === id);
   return l ? l.label : null;
-}
-
-function fmtDue(t) {
-  if (!t.due_date) return '';
-  const isToday = t.due_date === todayKey();
-  const isOverdue = t.due_date < todayKey() && t.status === 'open';
-  let label = isToday ? 'Today' : isOverdue ? `Overdue (${t.due_date})` : t.due_date;
-  if (t.due_time) label += ` ${t.due_time}`;
-  return label;
 }
 
 function friendlyDate(dateStr) {
@@ -199,6 +153,16 @@ function friendlyDueLabel(t) {
   const timeLabel = friendlyTime(t.due_time);
   if (!dateLabel) return 'No due date';
   return timeLabel ? `${dateLabel} at ${timeLabel}` : dateLabel;
+}
+
+function fmtDue(t) {
+  if (!t.due_date) return '';
+  const isOverdue = t.due_date < todayKey() && t.status === 'open';
+  const dateLabel = friendlyDate(t.due_date);
+  const timeLabel = friendlyTime(t.due_time);
+  let label = isOverdue ? `Overdue (${dateLabel})` : dateLabel;
+  if (timeLabel) label += ` ${timeLabel}`;
+  return label;
 }
 
 function el(tag, className, text) {
@@ -235,34 +199,20 @@ function dismissToast() {
   setTimeout(() => toast.classList.add('hidden'), 250);
 }
 
-function renderProjectFilter() {
-  const sel = document.getElementById('project-filter');
-  sel.innerHTML = '';
-  sel.appendChild(new Option('All projects', 'all'));
-  sortedProjects().forEach(p => sel.appendChild(new Option(p.name, p.id)));
-  sel.value = state.activeProjectId;
-}
-
 function renderTagFilter() {
   const wrap = document.getElementById('tag-filter');
   wrap.innerHTML = '';
   const tags = ['all', ...allPriorityTags()];
   tags.forEach(tag => {
-    const chip = el('button', 'chip' + (tag === state.activeTag ? ' chip-active' : ''), tag === 'all' ? 'All tags' : tag);
+    const chip = el('button', 'chip' + (tag === state.activeTag ? ' chip-active' : ''), tag === 'all' ? 'All labels' : tag);
     chip.addEventListener('click', () => {
       state.activeTag = tag;
       render();
       syncAddBarDefaultsFromFilters();
+      document.getElementById('filters-panel').classList.add('hidden');
     });
     wrap.appendChild(chip);
   });
-}
-
-function fillProjectSelect(selectEl, selectedId) {
-  const prior = selectedId !== undefined ? selectedId : selectEl.value;
-  selectEl.innerHTML = '';
-  sortedProjects().forEach(p => selectEl.appendChild(new Option(p.name, p.id)));
-  selectEl.value = prior || 'personal';
 }
 
 function fillLocationSelect(selectEl, selectedId) {
@@ -273,27 +223,16 @@ function fillLocationSelect(selectEl, selectedId) {
   selectEl.value = prior || '';
 }
 
-function renderProjectSelectForForm() {
-  fillProjectSelect(document.getElementById('task-project'));
-}
-
 function renderLocationSelectForForm() {
   fillLocationSelect(document.getElementById('task-location'));
 }
 
 function syncAddBarDefaultsFromFilters() {
-  const projectSel = document.getElementById('task-project');
-  const targetProjectId = state.activeProjectId === 'all' ? 'personal' : state.activeProjectId;
-  if ([...projectSel.options].some(o => o.value === targetProjectId)) {
-    projectSel.value = targetProjectId;
-  }
-  taskProjectManuallySet = false;
-
   const tagsInput = document.getElementById('task-tags');
   tagsInput.value = state.activeTag === 'all' ? '' : state.activeTag;
 }
 
-function renderColorSwatches(wrapId = 'project-color-swatches', hiddenInputId = 'project-color-input') {
+function renderColorSwatches(wrapId = 'label-color-swatches', hiddenInputId = 'label-color-input') {
   const wrap = document.getElementById(wrapId);
   const hiddenInput = document.getElementById(hiddenInputId);
   if (!hiddenInput.value) hiddenInput.value = MUTED_COLORS[0];
@@ -316,36 +255,36 @@ function taskRow(t, draggable) {
   const row = el('div', 'task-row' + (t.status === 'completed' ? ' task-done' : ''));
   row.dataset.id = t.id;
 
-  if (draggable) {
-    row.appendChild(el('span', 'drag-handle', '⠿'));
-  }
+  row.appendChild(el('span', 'drag-handle' + (draggable ? '' : ' drag-handle-hidden'), draggable ? '⠿' : ''));
 
   const check = el('input');
   check.type = 'checkbox';
+  check.className = 'task-checkbox';
   check.checked = t.status === 'completed';
   check.addEventListener('change', () => toggleComplete(t.id));
   row.appendChild(check);
 
-  const main = el('div', 'task-main');
-  const title = el('div', 'task-title', t.title);
-  main.appendChild(title);
+  (t.priority_tags || []).forEach(tag => {
+    const dot = el('span', 'tag-dot');
+    dot.style.background = tagColor(tag) || 'var(--text-muted)';
+    dot.title = tag;
+    row.appendChild(dot);
+  });
 
-  const meta = el('div', 'task-meta');
-  const bits = [projectName(t.project_id)];
+  row.appendChild(el('span', 'task-title', t.title));
+
+  const isOverdue = !!t.due_date && t.due_date < todayKey() && t.status === 'open';
+  const isToday = t.due_date === todayKey();
+  const bits = [];
   if (fmtDue(t)) bits.push(fmtDue(t));
   const loc = locationLabel(t.location_trigger_id);
   if (loc) bits.push(`📍 ${loc}`);
-  else if (t.pending_location_label) bits.push(`📍 ${t.pending_location_label} (not set up)`);
   if (t.recurrence_rule) bits.push('🔁');
-  meta.textContent = bits.join(' · ');
-  main.appendChild(meta);
-
-  if ((t.priority_tags || []).length) {
-    const tagsWrap = el('div', 'task-tags');
-    t.priority_tags.forEach(tag => tagsWrap.appendChild(tagBadge(tag)));
-    main.appendChild(tagsWrap);
+  if (bits.length) {
+    row.appendChild(el('span', 'task-sep', '·'));
+    const metaClass = 'task-meta-inline' + (isOverdue ? ' overdue' : isToday ? ' today' : '');
+    row.appendChild(el('span', metaClass, bits.join(' · ')));
   }
-  row.appendChild(main);
 
   const actions = el('div', 'task-actions');
   const editBtn = el('button', 'icon-btn', '✎');
@@ -423,43 +362,6 @@ function renderTaskList() {
   setupSortable();
 }
 
-function renderProjectsPanel() {
-  const list = document.getElementById('projects-list');
-  list.innerHTML = '';
-  sortedProjects().forEach(p => {
-    const row = el('div', 'list-row');
-    const swatch = el('span', 'swatch');
-    swatch.style.background = p.color || MUTED_COLORS[0];
-    row.appendChild(swatch);
-
-    const main = el('div', 'list-row-main');
-    main.appendChild(el('span', null, p.name));
-
-    const tagsForProject = new Set();
-    state.tasks
-      .filter(t => (t.project_id || 'personal') === p.id)
-      .forEach(t => (t.priority_tags || []).forEach(tag => tagsForProject.add(tag)));
-    if (tagsForProject.size) {
-      const tagsWrap = el('div', 'task-tags');
-      [...tagsForProject].sort().forEach(tag => tagsWrap.appendChild(tagBadge(tag)));
-      main.appendChild(tagsWrap);
-    }
-    row.appendChild(main);
-
-    const editBtn = el('button', 'icon-btn', '✎');
-    editBtn.title = 'Edit';
-    editBtn.addEventListener('click', () => openProjectEditModal(p.id));
-    row.appendChild(editBtn);
-
-    if (p.id !== 'personal') {
-      const del = el('button', 'icon-btn', '✕');
-      del.addEventListener('click', () => deleteProject(p.id));
-      row.appendChild(del);
-    }
-    list.appendChild(row);
-  });
-}
-
 function renderLabelsPanel() {
   const list = document.getElementById('labels-list');
   list.innerHTML = '';
@@ -486,7 +388,9 @@ function renderLocationsPanel() {
   list.innerHTML = '';
   sortedLocations().forEach(l => {
     const row = el('div', 'list-row');
-    row.appendChild(el('span', null, `${l.label} (${l.lat.toFixed(4)}, ${l.lng.toFixed(4)})`));
+    const hasCoords = l.lat != null && l.lng != null;
+    const label = hasCoords ? `${l.label} (${l.lat.toFixed(4)}, ${l.lng.toFixed(4)})` : `${l.label} — needs an address`;
+    row.appendChild(el('span', null, label));
     const del = el('button', 'icon-btn', '✕');
     del.addEventListener('click', () => deleteLocation(l.id));
     row.appendChild(del);
@@ -495,53 +399,53 @@ function renderLocationsPanel() {
 }
 
 function render() {
-  renderProjectFilter();
   renderTagFilter();
-  renderProjectSelectForForm();
   renderLocationSelectForForm();
   renderTaskList();
-  renderProjectsPanel();
   renderLabelsPanel();
   renderLocationsPanel();
+}
+
+async function resolveInferredLocation(locationLabelObj) {
+  if (!locationLabelObj || locationLabelObj.id || !locationLabelObj.inferred) return null;
+  const loc = { id: uid(), label: locationLabelObj.label, lat: null, lng: null };
+  await DB.put('locations', loc);
+  state.locations.push(loc);
+  return loc.id;
 }
 
 async function addTaskFromText(rawText) {
   const text = rawText.trim();
   if (!text) return;
 
-  const entries = parseEntry(text, state.locations, state.projects);
-  const pickedProjectId = document.getElementById('task-project').value || 'personal';
+  const entries = parseEntry(text, state.locations, getDefaultTaskTime());
   const tagsRaw = document.getElementById('task-tags').value.trim();
   const priorityTags = tagsRaw ? tagsRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
   await ensureLabelsExist(priorityTags);
   const manualLocationId = document.getElementById('task-location').value || null;
+
+  let inferredLocationId = null;
+  if (entries.length && entries[0].locationLabel && entries[0].locationLabel.inferred) {
+    inferredLocationId = await resolveInferredLocation(entries[0].locationLabel);
+  }
 
   const created = [];
   for (let i = 0; i < entries.length; i++) {
     const entry = entries[i];
     const now = new Date().toISOString();
     let locationTriggerId = manualLocationId;
-    let pendingLocationLabel = null;
     if (!locationTriggerId && entry.locationLabel) {
-      if (entry.locationLabel.id) locationTriggerId = entry.locationLabel.id;
-      else pendingLocationLabel = entry.locationLabel.label;
+      locationTriggerId = entry.locationLabel.id || inferredLocationId || null;
     }
-
-    let projectId;
-    if (taskProjectManuallySet) projectId = pickedProjectId;
-    else if (entry.projectMatch) projectId = entry.projectMatch.id;
-    else projectId = pickedProjectId;
 
     const task = {
       id: uid(),
       title: entry.title,
       description: '',
-      project_id: projectId,
       priority_tags: priorityTags,
       due_date: entry.due ? dateKey(entry.due) : null,
       due_time: entry.due ? entry.due.toTimeString().slice(0, 5) : null,
       location_trigger_id: locationTriggerId,
-      pending_location_label: pendingLocationLabel,
       status: 'open',
       completed_at: null,
       recurrence_rule: entry.recurrence || null,
@@ -660,7 +564,6 @@ function openEditModal(id) {
   if (!t) return;
   document.getElementById('edit-task-form').dataset.taskId = id;
   document.getElementById('edit-title').value = t.title;
-  fillProjectSelect(document.getElementById('edit-project'), t.project_id || 'personal');
   document.getElementById('edit-tags').value = (t.priority_tags || []).join(', ');
   document.getElementById('edit-due-date').value = t.due_date || '';
   document.getElementById('edit-due-time').value = t.due_time || '';
@@ -685,14 +588,12 @@ async function saveEditModal() {
   if (!t) return;
 
   t.title = document.getElementById('edit-title').value.trim() || t.title;
-  t.project_id = document.getElementById('edit-project').value || 'personal';
   const tagsRaw = document.getElementById('edit-tags').value.trim();
   t.priority_tags = tagsRaw ? tagsRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
   await ensureLabelsExist(t.priority_tags);
   t.due_date = document.getElementById('edit-due-date').value || null;
   t.due_time = document.getElementById('edit-due-time').value || null;
   t.location_trigger_id = document.getElementById('edit-location').value || null;
-  if (t.location_trigger_id) t.pending_location_label = null;
 
   const freq = document.getElementById('edit-recurrence-freq').value;
   if (!freq) {
@@ -713,70 +614,6 @@ async function saveEditModal() {
   closeEditModal();
   await loadAll();
   render();
-}
-
-async function addProject() {
-  const input = document.getElementById('project-name-input');
-  const name = input.value.trim();
-  if (!name) return;
-  const colorInput = document.getElementById('project-color-input');
-  await DB.put('projects', { id: uid(), name, color: colorInput.value || MUTED_COLORS[0] });
-  input.value = '';
-  colorInput.value = MUTED_COLORS[0];
-  renderColorSwatches();
-  await loadAll();
-  render();
-}
-
-async function deleteProject(id) {
-  await DB.remove('projects', id);
-  const affected = state.tasks.filter(t => t.project_id === id);
-  for (const t of affected) {
-    t.project_id = 'personal';
-    await DB.put('tasks', t);
-  }
-  await loadAll();
-  render();
-}
-
-async function updateProject(id, { name, color }) {
-  const p = state.projects.find(p => p.id === id);
-  if (!p) return;
-  p.name = name;
-  p.color = color;
-  await DB.put('projects', p);
-  await loadAll();
-  render();
-}
-
-function openProjectEditModal(id) {
-  const p = state.projects.find(p => p.id === id);
-  if (!p) return;
-  document.getElementById('project-edit-form').dataset.projectId = id;
-  document.getElementById('project-edit-name-input').value = p.name;
-  document.getElementById('project-edit-color-input').value = p.color || MUTED_COLORS[0];
-  renderColorSwatches('project-edit-color-swatches', 'project-edit-color-input');
-  document.getElementById('project-edit-modal').classList.remove('hidden');
-}
-
-function closeProjectEditModal() {
-  document.getElementById('project-edit-modal').classList.add('hidden');
-}
-
-function setupProjectEditModal() {
-  document.getElementById('project-edit-form').addEventListener('submit', async e => {
-    e.preventDefault();
-    const id = document.getElementById('project-edit-form').dataset.projectId;
-    const name = document.getElementById('project-edit-name-input').value.trim();
-    if (!name) return;
-    const color = document.getElementById('project-edit-color-input').value || MUTED_COLORS[0];
-    await updateProject(id, { name, color });
-    closeProjectEditModal();
-  });
-  document.getElementById('project-edit-cancel-btn').addEventListener('click', closeProjectEditModal);
-  document.getElementById('project-edit-modal').addEventListener('click', e => {
-    if (e.target.id === 'project-edit-modal') closeProjectEditModal();
-  });
 }
 
 async function addLocation({ label, lat, lng }) {
@@ -1124,13 +961,14 @@ function activateTab(panelId) {
   const btn = document.querySelector(`.tab-btn[data-panel="${panelId}"]`);
   if (btn) btn.classList.add('tab-active');
   document.getElementById(panelId).classList.add('panel-active');
-  if (panelId === 'panel-locations') onLocationsTabShown();
+  if (panelId === 'panel-settings') onLocationsTabShown();
 }
 
 function setupTabs() {
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => activateTab(btn.dataset.panel));
   });
+  document.getElementById('settings-gear-btn').addEventListener('click', () => activateTab('panel-settings'));
 }
 
 function setupEditModal() {
@@ -1198,21 +1036,21 @@ function setupForms() {
   document.getElementById('add-task-form').addEventListener('submit', e => {
     e.preventDefault();
     addTaskFromText(document.getElementById('task-input').value);
+    document.getElementById('add-task-wrap').classList.add('hidden');
   });
 
-  document.getElementById('project-filter').addEventListener('change', e => {
-    state.activeProjectId = e.target.value;
-    render();
-    syncAddBarDefaultsFromFilters();
+  document.getElementById('filters-btn').addEventListener('click', () => {
+    document.getElementById('filters-panel').classList.toggle('hidden');
   });
 
-  document.getElementById('task-project').addEventListener('change', () => {
-    taskProjectManuallySet = true;
+  document.getElementById('add-toggle-btn').addEventListener('click', () => {
+    const wrap = document.getElementById('add-task-wrap');
+    wrap.classList.toggle('hidden');
+    if (!wrap.classList.contains('hidden')) document.getElementById('task-input').focus();
   });
 
-  document.getElementById('add-project-form').addEventListener('submit', e => {
-    e.preventDefault();
-    addProject();
+  document.getElementById('default-task-time-input').addEventListener('change', e => {
+    localStorage.setItem('defaultTaskTime', e.target.value || '09:00');
   });
 
   document.getElementById('add-location-form').addEventListener('submit', e => {
@@ -1246,16 +1084,14 @@ function setupForms() {
 
   setupAddressSearch();
   setupEditModal();
-  setupProjectEditModal();
   setupLabelForms();
 }
 
 async function init() {
-  await ensureDefaultProject();
   await rolloverAndPurge();
   await loadAll();
-  renderColorSwatches();
   renderColorSwatches('label-color-swatches', 'label-color-input');
+  document.getElementById('default-task-time-input').value = localStorage.getItem('defaultTaskTime') || '09:00';
   render();
   syncAddBarDefaultsFromFilters();
   setupTabs();

@@ -1,6 +1,6 @@
 const DB_NAME = 'todoapp';
 const DB_VERSION = 2;
-const STORES = ['tasks', 'projects', 'locations', 'digests', 'labels'];
+const STORES = ['tasks', 'locations', 'digests', 'labels'];
 
 let dbPromise = null;
 

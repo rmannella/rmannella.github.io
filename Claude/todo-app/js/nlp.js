@@ -21,13 +21,7 @@ function capitalize(s) {
 
 function extractLocation(text, knownLocations) {
   const labels = knownLocations.map(l => l.label.toLowerCase());
-  const patterns = [
-    /\bwhen i (?:get|arrive|am|get back|'m)\s*(?:home|at\s+(\w+)|to\s+(?:the\s+)?(\w+))\b/i,
-    /\bwhen i get (\w+)\b/i,
-    /\bat (?:the\s+)?(\w+)\b(?=.*$)/i,
-  ];
 
-  const lowered = text.toLowerCase();
   for (const label of labels) {
     const re = new RegExp(`\\bwhen i (?:get|arrive|am)\\s+(?:home|to\\s+(?:the\\s+)?${label}|at\\s+(?:the\\s+)?${label})\\b|\\bat (?:the\\s+)?${label}\\b`, 'i');
     const m = text.match(re);
@@ -42,19 +36,19 @@ function extractLocation(text, knownLocations) {
     return { label: knownLocations.find(l => l.label.toLowerCase() === 'home') || { label: 'Home', inferred: true }, cleaned: text.replace(homeMatch[0], '').trim() };
   }
 
-  for (const genericLabel of ['office', 'work', 'gym']) {
-    const re = new RegExp(`\\bwhen i (?:get|arrive|am)\\s+(?:to\\s+(?:the\\s+)?|at\\s+(?:the\\s+)?)?${genericLabel}\\b`, 'i');
-    const m = text.match(re);
-    if (m) {
-      const known = knownLocations.find(l => l.label.toLowerCase() === genericLabel);
-      return { label: known || { label: capitalize(genericLabel), inferred: true }, cleaned: text.replace(m[0], '').trim() };
-    }
+  // Any unrecognized single-word place name after "when I get/arrive/am (to/at) ___"
+  // (e.g. "work", "gym", "the dentist") is treated as a new, not-yet-saved location.
+  const genericRe = /\bwhen i (?:get|arrive|am)\s+(?:to\s+(?:the\s+)?|at\s+(?:the\s+)?)?([a-z][a-z'-]{1,20})\b/i;
+  const genericMatch = text.match(genericRe);
+  if (genericMatch) {
+    const name = capitalize(genericMatch[1].trim());
+    return { label: { label: name, inferred: true }, cleaned: text.replace(genericMatch[0], '').trim() };
   }
 
   return { label: null, cleaned: text };
 }
 
-function extractDateTime(text, now = new Date()) {
+function extractDateTime(text, now = new Date(), defaultTime = { hour: 9, minute: 0 }) {
   let cleaned = text;
   let due = null;
 
@@ -74,7 +68,7 @@ function extractDateTime(text, now = new Date()) {
     if (tomorrowMatch) {
       due = new Date(now);
       due.setDate(due.getDate() + 1);
-      due.setHours(9, 0, 0, 0);
+      due.setHours(defaultTime.hour, defaultTime.minute, 0, 0);
       cleaned = cleaned.replace(tomorrowMatch[0], '').trim();
     }
   }
@@ -96,7 +90,7 @@ function extractDateTime(text, now = new Date()) {
       let diff = (targetDay - due.getDay() + 7) % 7;
       if (diff === 0 || wdMatch[1]) diff += 7;
       due.setDate(due.getDate() + diff);
-      due.setHours(9, 0, 0, 0);
+      due.setHours(defaultTime.hour, defaultTime.minute, 0, 0);
       cleaned = cleaned.replace(wdMatch[0], '').trim();
     }
   }
@@ -127,37 +121,21 @@ function extractRecurrence(text) {
   return { recurrence: null, cleaned: text };
 }
 
-function escapeRegExp(s) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function extractProject(text, knownProjects) {
-  for (const p of knownProjects) {
-    const escaped = escapeRegExp(p.name);
-    const re = new RegExp(`\\bfor (?:the\\s+)?${escaped}\\b`, 'i');
-    const m = text.match(re);
-    if (m) {
-      return { project: p, cleaned: text.replace(m[0], '').trim() };
-    }
-  }
-  return { project: null, cleaned: text };
-}
-
 function splitTasks(text) {
   const parts = text
-    .split(/,| and (?!the |a |some )/i)
+    .split(',')
     .map(s => s.trim())
     .filter(Boolean);
   return parts.length ? parts : [text.trim()];
 }
 
-function parseEntry(rawText, knownLocations = [], knownProjects = [], now = new Date()) {
+function parseEntry(rawText, knownLocations = [], defaultTime = { hour: 9, minute: 0 }, now = new Date()) {
   let text = stripLeadPhrase(rawText.trim());
 
   const locResult = extractLocation(text, knownLocations);
   text = locResult.cleaned;
 
-  const dtResult = extractDateTime(text, now);
+  const dtResult = extractDateTime(text, now, defaultTime);
   text = dtResult.cleaned;
 
   const recResult = extractRecurrence(text);
@@ -165,9 +143,6 @@ function parseEntry(rawText, knownLocations = [], knownProjects = [], now = new 
 
   let due = dtResult.due;
   if (recResult.recurrence && !due) due = new Date(now);
-
-  const projResult = extractProject(text, knownProjects);
-  text = projResult.cleaned;
 
   text = text.replace(/^to\s+/i, '').trim();
 
@@ -178,6 +153,5 @@ function parseEntry(rawText, knownLocations = [], knownProjects = [], now = new 
     due,
     locationLabel: locResult.label,
     recurrence: recResult.recurrence,
-    projectMatch: projResult.project,
   }));
 }
