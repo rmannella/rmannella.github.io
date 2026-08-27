@@ -13,14 +13,14 @@ accent, a dedicated muted-red `--record` token for the recording state
 since "live recording" and "destructive action" are different concerns), a
 spacing scale (`--space-1`…`--space-6`), a two-tier radius scale plus a
 pill constant, soft warm-tinted shadows, and shared transition timing
-tokens. Headings and content titles (task titles, project/label/location
-names) use a Georgia-led system serif stack for a warmer, more editorial
-feel; buttons, inputs, and other UI chrome stay on the system sans stack —
-no webfont is loaded, keeping the app's zero-extra-network-request,
+tokens. Headings and content titles (task titles, label/location names) use
+a Georgia-led system serif stack for a warmer, more editorial feel;
+buttons, inputs, and other UI chrome stay on the system sans stack — no
+webfont is loaded, keeping the app's zero-extra-network-request,
 offline-first posture intact. Cards (`task-row`/`list-row`/modal/toast) are
-borderless with a soft shadow; functional controls
-(inputs, buttons, chips) keep a hairline border. Every interactive element
-has a hover, `:active` press-scale, and `:focus-visible` state.
+borderless with a soft shadow; functional controls (inputs, buttons, chips)
+keep a hairline border. Every interactive element has a hover, `:active`
+press-scale, and `:focus-visible` state.
 
 ## What's actually implemented
 
@@ -38,22 +38,62 @@ has a hover, `:active` press-scale, and `:focus-visible` state.
   flow now. Browsers without `SpeechRecognition` (e.g. iOS Safari) get the
   manual field auto-expanded instead of a dead-end disabled circle.
 
-- **Tasks tab** (formerly "Today") shows every open task in one list —
-  today's and overdue tasks are pinned to the top, everything else follows
-  sorted by due date ascending (undated tasks last). Auto-rollover keeps
-  overdue open tasks pinned at the top day after day, and completed tasks
-  stay struck through until midnight, then archive (purged 30 days after
-  completion) — all via `js/app.js` + IndexedDB (`js/db.js`). Project/tag
-  filters sit at the top of the panel, above the add-task bar.
-- **Projects** ("Personal" as default) and **custom priority tags**,
-  filterable.
+- **Tasks tab** shows every open task in one compact, single-line-first
+  list — today's and overdue tasks are pinned to the top, everything else
+  follows sorted by due date ascending (undated tasks last), rendered as
+  "Today" / "Tomorrow" / "Sat, Aug 22"-style friendly dates rather than raw
+  ISO strings (`friendlyDate()`/`friendlyTime()` in `js/app.js`). Priority
+  tags show as small colored dots rather than full pill badges; the ✎ / →
+  / ✕ row actions stay hidden until you hover a row (always visible on
+  touch devices, where hover doesn't apply). A single **Filters** button
+  above the list opens a small label-only filter panel (single-select) —
+  there's no separate project filter anymore, since Projects were removed
+  (see below). Tasks are added via a collapsed "+" trigger next to
+  Filters, which expands the add-task bar inline and collapses it again
+  after a successful add. Auto-rollover keeps overdue open tasks pinned at
+  the top day after day, and completed tasks stay struck through until
+  midnight, then archive (purged 30 days after completion) — all via
+  `js/app.js` + IndexedDB (`js/db.js`).
+
+- **Settings lives behind a gear icon** in the top-right of the header
+  (`#settings-gear-btn`), not a tab — it's a separate concern from
+  Record/Tasks, the app's two main views. **Locations** and **Labels**
+  management (previously their own tabs) are now sub-sections inside
+  Settings, along with notifications, export/import, and a new
+  **default task time** field (see below).
+
+- **Projects have been removed.** The app now organizes tasks with
+  **labels only** — no project grouping, no "Personal" default, no
+  project picker or filter. Existing tasks' old project association is
+  simply no longer read (not migrated to a label). Custom priority tags
+  remain, filterable via the single Filters button above.
+- **Default task time** (Settings): a time picker sets what hour a task
+  gets when NLP infers "tomorrow" or a weekday without an explicit time
+  in the text (was hardcoded to 9:00am; stored in `localStorage`, threaded
+  into `js/nlp.js`'s `extractDateTime()`/`parseEntry()` as a `defaultTime`
+  parameter).
 - **Push to tomorrow** (→) per task.
 - **Recurring tasks** (daily / weekly / custom interval) — completing a
   recurring task spawns the next occurrence.
 - **Free-text capture with lightweight NL parsing** (`js/nlp.js`): dates
   ("tomorrow", "Friday", "in 2 hours", "at 3pm"), location phrases ("when I
-  get home"), and multi-task splitting ("...take out the trash and call
-  mom").
+  get home", "when I get to the dentist" — see below), and **comma-based
+  multi-task splitting** ("take out the trash, call mom" → two tasks).
+  Splitting no longer triggers on the word "and" — testing showed "and"
+  is used far more often to join two halves of the *same* task ("text
+  Paulie and ask about ice cream", "combine the projects and labels into
+  one page") than to separate two different ones, and there's no reliable
+  regex-only way to tell those apart. Use a comma (or add tasks
+  separately) to get multiple tasks from one capture.
+- **Location phrases auto-create a real location.** Saying "when I get to
+  work" (or any other not-yet-saved place — "the dentist", "the gym") now
+  creates a real Location row immediately (coordinates left blank) and
+  links the task to it, instead of leaving a dead-end text hint on the
+  task. The new location shows up under Settings → Locations flagged
+  "needs an address" — filling in an address there (via the existing
+  search/map picker) is all that's needed for the reminder to start
+  working; no need to re-edit the task. Saying the same place name again
+  later reuses the same location rather than creating a duplicate.
 - **Voice capture on the Tasks tab's quick-add bar** (the small mic icon
   next to the text field, click-to-toggle rather than press-and-hold) via
   the same `SpeechRecognition` API (Chrome on Android supports this) —
@@ -62,7 +102,8 @@ has a hover, `:active` press-scale, and `:focus-visible` state.
 - **Named locations** with lat/lng (150m fixed radius, matches spec) and a
   **foreground geofence check** (`js/geofence.js`) that fires a
   notification when you enter a saved location's radius while the app is
-  open.
+  open. Locations without coordinates yet (see auto-create above) are
+  skipped by the geofence check rather than erroring.
 - **Time-based notifications** for tasks with a due time, checked locally.
 - **Offline support**: all data lives in IndexedDB; the service worker
   (`sw.js`) caches the app shell so the whole app loads with no network.
@@ -70,12 +111,11 @@ has a hover, `:active` press-scale, and `:focus-visible` state.
   recorded per day (`digests` IndexedDB store, `bumpDigest()`), but there's
   no digest panel in the UI anymore — the data's kept for potential future
   surfacing.
-- **Manual export/import** (Settings tab) as a JSON file — a practical
+- **Manual export/import** (Settings) as a JSON file — a practical
   stopgap for moving data between devices by hand.
 - Installable PWA (`manifest.webmanifest`).
-- **Edit any task** after adding it (title, project, tags, due date/time,
-  location trigger, recurrence) via the ✎ button, which opens an edit
-  sheet.
+- **Edit any task** after adding it (title, tags, due date/time, location
+  trigger, recurrence) via the ✎ button, which opens an edit sheet.
 - **Manual drag-to-reorder** of open tasks (drag the ⠿ handle), backed by
   [SortableJS](https://github.com/SortableJS/Sortable) and a `sort_order`
   field on each task. Completed tasks stay pinned below and aren't
@@ -92,9 +132,6 @@ has a hover, `:active` press-scale, and `:focus-visible` state.
   still need a live connection. Nominatim's usage policy caps this at
   light, interactive use (no bulk geocoding) — fine for a personal app,
   not something to scale up without switching to a paid provider.
-- **Muted color palette** for projects — a fixed set of dusty/muted swatches
-  instead of an open color picker, and the app's accent color was toned
-  down to match.
 - Logo in the header, pulled from `/images/logo.png` (the same file the
   main site uses) rather than duplicated into this folder — given a black
   badge background since the artwork is white-on-transparent (designed for
@@ -104,31 +141,17 @@ has a hover, `:active` press-scale, and `:focus-visible` state.
   undo just cancels the pending removal. Best-effort only: if the page
   closes/reloads before the window elapses, the task survives (the delete
   never committed).
-- **Edit a project's name/color** after creation, via the same ✎ pattern as
-  tasks.
-- **"Labels"**: priority tags are now a real entity (new `labels` IndexedDB
-  store, `{id, name, color}`) with their own tab — rename (cascades across
+- **"Labels"**: priority tags are a real entity (`labels` IndexedDB store,
+  `{id, name, color}`) managed under Settings — rename (cascades across
   every task using that tag) and delete (removes it from every task), each
-  with a color from the same muted palette as projects. Tasks still store
-  tag *names* as plain strings (no data migration for existing tasks);
-  typing a brand-new tag name anywhere auto-creates its label entry.
-  Task-row and project-card tag badges are colored from the matching label.
-- **Project cards show their tags** as colored pill bubbles (the distinct
-  priority tags across that project's tasks), same badge component used on
-  task rows.
-- **NLP recognizes recurrence and project names**: "take vitamins every
-  day"/"...daily" creates a daily-recurring task (defaulting its due date
-  to today if no other date was given, since recurrence needs a base date
-  to regenerate from); "...for Hudson Ave" auto-assigns the task to an
-  *existing* project named "Hudson Ave" — it never creates a new project
-  from text.
-- **New tasks inherit the current Tasks-view filter**: the add-bar's
-  project/tag pickers now default to whatever project/tag the Tasks view
-  is currently filtered to (falling back to Personal/no-tag when the
-  filter is "All"), while still being manually overridable per task.
-  Precedence when a task is captured via NLP text: an explicit manual pick
-  in the add-bar picker wins, then an NLP-detected project match from the
-  text, then the filter-synced default.
+  with a color from a fixed muted palette. Tasks still store tag *names*
+  as plain strings (no data migration for existing tasks); typing a
+  brand-new tag name anywhere auto-creates its label entry. Task rows show
+  a small colored dot per label, colored from the matching label entry.
+- **New tasks inherit the current Tasks-view filter**: the add-bar's tag
+  field defaults to whatever label the Tasks view is currently filtered
+  to (blank when the filter is "All labels"), while still being manually
+  overridable per task.
 
 ## What's intentionally NOT implemented (needs real backend infra)
 
@@ -162,11 +185,11 @@ Also out of scope for the same reason (needs a server):
 ## Known limitation: reordering under an active filter
 
 Drag-to-reorder renumbers `sort_order` only for the tasks currently visible
-(after project/tag filtering). If you reorder while a filter is active, the
-new order is relative to that filtered set — clearing the filter afterward
-can interleave those tasks with others in a way that isn't perfectly
-predictable. Reordering with no filter active avoids this entirely. Separately,
-`sort_order` itself now only determines order within the pinned
+(after the label filter). If you reorder while a filter is active, the new
+order is relative to that filtered set — clearing the filter afterward can
+interleave those tasks with others in a way that isn't perfectly
+predictable. Reordering with no filter active avoids this entirely.
+Separately, `sort_order` itself only determines order within the pinned
 today/overdue group at the top of the list — tasks below that are always
 ordered by due date, so dragging one of them has no visible effect after
 the next render.

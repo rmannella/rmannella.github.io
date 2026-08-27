@@ -13,17 +13,21 @@
 </head>
 <body>
 <header class="app-header">
-  <div class="brand">
-    <img src="/images/logo.png" alt="Rachel Mannella" class="app-logo">
-    <h1>To-Do</h1>
+  <div class="header-top">
+    <div class="brand">
+      <img src="/images/logo.png" alt="Rachel Mannella" class="app-logo">
+      <h1>To-Do</h1>
+    </div>
+    <button type="button" id="settings-gear-btn" class="icon-btn settings-gear" title="Settings" aria-label="Settings">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"></circle>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+      </svg>
+    </button>
   </div>
   <nav class="tabs">
     <button class="tab-btn tab-active" data-panel="panel-record">Record</button>
     <button class="tab-btn" data-panel="panel-today">Tasks</button>
-    <button class="tab-btn" data-panel="panel-projects">Projects</button>
-    <button class="tab-btn" data-panel="panel-labels">Labels</button>
-    <button class="tab-btn" data-panel="panel-locations">Locations</button>
-    <button class="tab-btn" data-panel="panel-settings">Settings</button>
   </nav>
 </header>
 
@@ -67,78 +71,45 @@
   </section>
 
   <section id="panel-today" class="panel">
-    <h2>Tasks</h2>
+    <div class="tasks-topbar">
+      <h2>Tasks</h2>
+      <button type="button" id="filters-btn" class="filters-btn">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M7 12h10M10 18h4"></path></svg>
+        Filters
+      </button>
+      <button type="button" id="add-toggle-btn" class="add-fab" title="Add a task" aria-label="Add a task">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+      </button>
+    </div>
 
-    <div class="filters">
-      <select id="project-filter"></select>
+    <div id="filters-panel" class="filters-panel hidden">
       <div id="tag-filter" class="chip-row"></div>
     </div>
 
-    <form id="add-task-form" class="add-task-form">
-      <input id="task-input" type="text" placeholder='e.g. "remind me when I get home to take out the trash and call mom"' autocomplete="off">
-      <button type="button" id="mic-btn" class="icon-btn mic-btn" title="Voice input">🎤</button>
-      <button type="submit" class="primary-btn">Add</button>
-    </form>
-
-    <div class="add-task-extras">
-      <select id="task-project"></select>
-      <input id="task-tags" type="text" placeholder="priority tags, comma separated">
-      <select id="task-location"></select>
+    <div id="add-task-wrap" class="add-task-wrap hidden">
+      <form id="add-task-form" class="add-task-form">
+        <input id="task-input" type="text" placeholder='e.g. "remind me when I get home to take out the trash and call mom"' autocomplete="off">
+        <button type="button" id="mic-btn" class="icon-btn mic-btn" title="Voice input">🎤</button>
+        <button type="submit" class="primary-btn">Add</button>
+      </form>
+      <div class="add-task-extras">
+        <input id="task-tags" type="text" placeholder="priority tags, comma separated">
+        <select id="task-location"></select>
+      </div>
     </div>
 
     <div id="task-list-open" class="task-list"></div>
     <div id="task-list-done" class="task-list task-list-done"></div>
   </section>
 
-  <section id="panel-projects" class="panel">
-    <h2>Projects</h2>
-    <form id="add-project-form" class="inline-form">
-      <input id="project-name-input" type="text" placeholder="Project name">
-      <div id="project-color-swatches" class="swatch-picker"></div>
-      <input type="hidden" id="project-color-input" value="">
-      <button type="submit" class="primary-btn">Add</button>
-    </form>
-    <div id="projects-list" class="list"></div>
-  </section>
-
-  <section id="panel-labels" class="panel">
-    <h2>Labels</h2>
-    <form id="add-label-form" class="inline-form">
-      <input id="label-name-input" type="text" placeholder="Label name">
-      <div id="label-color-swatches" class="swatch-picker"></div>
-      <input type="hidden" id="label-color-input" value="">
-      <button type="submit" class="primary-btn">Add</button>
-    </form>
-    <div id="labels-list" class="list"></div>
-  </section>
-
-  <section id="panel-locations" class="panel">
-    <h2>Locations</h2>
-    <p class="hint">Geofence radius is fixed at ~150m for all locations.</p>
-    <form id="add-location-form" class="location-form">
-      <input id="location-name-input" type="text" placeholder="Label (e.g. Home)">
-
-      <div class="address-search-row">
-        <input id="location-address-input" type="text" placeholder="Search an address">
-        <button type="button" id="address-search-btn" class="secondary-btn">Search</button>
-      </div>
-      <div id="address-results" class="address-results hidden"></div>
-
-      <div id="location-map" class="location-map"></div>
-      <p class="hint">Tap or drag the pin on the map to set the exact spot.</p>
-
-      <div class="coord-row">
-        <input id="location-lat-input" type="text" placeholder="Lat" inputmode="decimal">
-        <input id="location-lng-input" type="text" placeholder="Lng" inputmode="decimal">
-        <button type="button" id="use-current-location-btn" class="icon-btn" title="Use current location">📍</button>
-      </div>
-      <button type="submit" class="primary-btn">Add location</button>
-    </form>
-    <div id="locations-list" class="list"></div>
-  </section>
-
   <section id="panel-settings" class="panel">
     <h2>Settings</h2>
+
+    <div class="settings-row">
+      <label class="field-label" style="flex: 1;">Default task time
+        <input type="time" id="default-task-time-input">
+      </label>
+    </div>
     <div class="settings-row">
       <button id="notif-btn" class="primary-btn">Enable notifications</button>
       <span id="notif-status" class="hint"></span>
@@ -155,6 +126,42 @@
       between devices yet — see the project README for what's needed to add
       real cross-device sync.
     </p>
+
+    <div class="settings-section">
+      <h3>Locations</h3>
+      <p class="hint">Geofence radius is fixed at ~150m for all locations.</p>
+      <form id="add-location-form" class="location-form">
+        <input id="location-name-input" type="text" placeholder="Label (e.g. Home)">
+
+        <div class="address-search-row">
+          <input id="location-address-input" type="text" placeholder="Search an address">
+          <button type="button" id="address-search-btn" class="secondary-btn">Search</button>
+        </div>
+        <div id="address-results" class="address-results hidden"></div>
+
+        <div id="location-map" class="location-map"></div>
+        <p class="hint">Tap or drag the pin on the map to set the exact spot.</p>
+
+        <div class="coord-row">
+          <input id="location-lat-input" type="text" placeholder="Lat" inputmode="decimal">
+          <input id="location-lng-input" type="text" placeholder="Lng" inputmode="decimal">
+          <button type="button" id="use-current-location-btn" class="icon-btn" title="Use current location">📍</button>
+        </div>
+        <button type="submit" class="primary-btn">Add location</button>
+      </form>
+      <div id="locations-list" class="list"></div>
+    </div>
+
+    <div class="settings-section">
+      <h3>Labels</h3>
+      <form id="add-label-form" class="inline-form">
+        <input id="label-name-input" type="text" placeholder="Label name">
+        <div id="label-color-swatches" class="swatch-picker"></div>
+        <input type="hidden" id="label-color-input" value="">
+        <button type="submit" class="primary-btn">Add</button>
+      </form>
+      <div id="labels-list" class="list"></div>
+    </div>
   </section>
 </main>
 
@@ -164,9 +171,6 @@
     <form id="edit-task-form">
       <label class="field-label">Title
         <input id="edit-title" type="text" placeholder="Title">
-      </label>
-      <label class="field-label">Project
-        <select id="edit-project"></select>
       </label>
       <label class="field-label">Priority tags
         <input id="edit-tags" type="text" placeholder="comma separated">
@@ -205,25 +209,6 @@
         <button type="button" id="edit-delete-btn" class="danger-btn">Delete task</button>
         <div class="modal-actions-right">
           <button type="button" id="edit-cancel-btn" class="secondary-btn">Cancel</button>
-          <button type="submit" class="primary-btn">Save</button>
-        </div>
-      </div>
-    </form>
-  </div>
-</div>
-
-<div id="project-edit-modal" class="modal-overlay hidden">
-  <div class="modal">
-    <h2>Edit project</h2>
-    <form id="project-edit-form">
-      <label class="field-label">Name
-        <input id="project-edit-name-input" type="text" placeholder="Project name">
-      </label>
-      <div id="project-edit-color-swatches" class="swatch-picker"></div>
-      <input type="hidden" id="project-edit-color-input" value="">
-      <div class="modal-actions">
-        <div class="modal-actions-right">
-          <button type="button" id="project-edit-cancel-btn" class="secondary-btn">Cancel</button>
           <button type="submit" class="primary-btn">Save</button>
         </div>
       </div>

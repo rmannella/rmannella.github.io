@@ -38,6 +38,7 @@ class Geofencer {
   check(lat, lng) {
     const locations = this.getLocations();
     for (const loc of locations) {
+      if (loc.lat == null || loc.lng == null) continue;
       const dist = haversineMeters(lat, lng, loc.lat, loc.lng);
       const wasInside = this.inside.has(loc.id);
       const isInside = dist <= GEOFENCE_RADIUS_M;
