@@ -1,4 +1,12 @@
 const MUTED_COLORS = ['#6c8ead', '#8a9a7b', '#b98d6f', '#a97c92', '#7c9c96', '#c2a26a', '#8f8fa3', '#a1755c'];
+const WEEKDAY_ABBR = ['Sun', 'Mon', 'Tue', 'Wed', 'Thurs', 'Fri', 'Sat'];
+const EMPTY_STATE_MESSAGES = [
+  'Nothing here. Tap + above, or head to Record and just say it.',
+  'A blank slate — what needs doing?',
+  'All clear for now.',
+  'Nothing on the list yet. Add one whenever you\'re ready.',
+  'Empty — hold the mic on Record, or tap + to type one.',
+];
 
 const state = {
   tasks: [],
@@ -139,7 +147,7 @@ function friendlyDate(dateStr) {
   if (dateStr === todayKey()) return 'Today';
   if (dateStr === addDays(todayKey(), 1)) return 'Tomorrow';
   const d = new Date(`${dateStr}T00:00:00`);
-  return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+  return `${WEEKDAY_ABBR[d.getDay()]} ${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
 }
 
 function friendlyTime(timeStr) {
@@ -155,6 +163,11 @@ function friendlyDueLabel(t) {
   const timeLabel = friendlyTime(t.due_time);
   if (!dateLabel) return 'No due date';
   return timeLabel ? `${dateLabel} at ${timeLabel}` : dateLabel;
+}
+
+function emptyStateMessage() {
+  const dayIndex = Math.floor(Date.now() / 86400000);
+  return EMPTY_STATE_MESSAGES[dayIndex % EMPTY_STATE_MESSAGES.length];
 }
 
 function fmtDue(t) {
@@ -410,7 +423,7 @@ function renderTaskList() {
 
   if (!open.length) {
     openList.appendChild(
-      el('div', 'empty-state', visible.length ? 'All caught up for now.' : 'Nothing here. Add a task above.')
+      el('div', 'empty-state', visible.length ? 'All caught up for now.' : emptyStateMessage())
     );
   } else {
     open.forEach(t => openList.appendChild(taskRow(t, true)));
@@ -617,21 +630,86 @@ async function reorderOpenTasks(ids) {
   render();
 }
 
+function datePresetValue(preset) {
+  if (preset === 'today') return todayKey();
+  if (preset === 'tomorrow') return addDays(todayKey(), 1);
+  if (preset === 'nextweek') return addDays(todayKey(), 7);
+  return '';
+}
+
+function applyDatePreset(preset) {
+  document.getElementById('edit-due-date').value = datePresetValue(preset);
+  if (preset === 'none') document.getElementById('edit-due-time').value = '';
+  syncDateChipActiveState();
+}
+
+function syncDateChipActiveState() {
+  const dateVal = document.getElementById('edit-due-date').value;
+  document.querySelectorAll('#edit-date-chips .chip').forEach(chip => {
+    const preset = chip.dataset.preset;
+    const matches = preset === 'none' ? !dateVal : datePresetValue(preset) === dateVal;
+    chip.classList.toggle('chip-active', matches);
+  });
+}
+
+function renderEditTagsDropdown(selectedTags) {
+  const panel = document.getElementById('edit-tags-panel');
+  panel.innerHTML = '';
+  sortedLabels().forEach(l => {
+    const row = el('label', 'dropdown-option');
+    const cb = el('input');
+    cb.type = 'checkbox';
+    cb.value = l.name;
+    cb.checked = selectedTags.some(tag => tag.toLowerCase() === l.name.toLowerCase());
+    cb.addEventListener('change', updateEditTagsTriggerLabel);
+    row.appendChild(cb);
+    const dot = el('span', 'tag-dot');
+    dot.style.background = l.color || 'var(--text-muted)';
+    row.appendChild(dot);
+    row.appendChild(el('span', null, l.name));
+    panel.appendChild(row);
+  });
+  updateEditTagsTriggerLabel();
+}
+
+function getEditSelectedTags() {
+  return Array.from(document.querySelectorAll('#edit-tags-panel input:checked')).map(cb => cb.value);
+}
+
+function updateEditTagsTriggerLabel() {
+  const selected = getEditSelectedTags();
+  document.getElementById('edit-tags-trigger').textContent = selected.length ? selected.join(', ') : 'Select labels';
+}
+
+function setRecurrenceSegmented(freq) {
+  document.querySelectorAll('#edit-recurrence-segmented button').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.freq === (freq || ''));
+  });
+  document.getElementById('edit-recurrence-custom').classList.toggle('hidden', freq !== 'custom');
+}
+
 function openEditModal(id) {
   const t = state.tasks.find(t => t.id === id);
   if (!t) return;
   document.getElementById('edit-task-form').dataset.taskId = id;
   document.getElementById('edit-title').value = t.title;
-  document.getElementById('edit-tags').value = (t.priority_tags || []).join(', ');
   document.getElementById('edit-due-date').value = t.due_date || '';
   document.getElementById('edit-due-time').value = t.due_time || '';
+  syncDateChipActiveState();
+
+  renderEditTagsDropdown(t.priority_tags || []);
+  document.getElementById('edit-tags-panel').classList.add('hidden');
+
   fillLocationSelect(document.getElementById('edit-location'), t.location_trigger_id || '');
 
   const rule = t.recurrence_rule;
-  document.getElementById('edit-recurrence-freq').value = rule ? rule.freq : '';
+  setRecurrenceSegmented(rule ? rule.freq : '');
   document.getElementById('edit-recurrence-interval').value = (rule && rule.interval) || 1;
   document.getElementById('edit-recurrence-unit').value = (rule && rule.unit) || 'day';
-  document.getElementById('edit-recurrence-custom').classList.toggle('hidden', !(rule && rule.freq === 'custom'));
+
+  const hasExtras = (t.priority_tags || []).length > 0 || !!t.location_trigger_id || !!rule;
+  document.getElementById('edit-more-fields').classList.toggle('hidden', !hasExtras);
+  document.getElementById('edit-more-toggle').classList.toggle('expanded', hasExtras);
 
   document.getElementById('edit-modal').classList.remove('hidden');
 }
@@ -646,14 +724,12 @@ async function saveEditModal() {
   if (!t) return;
 
   t.title = document.getElementById('edit-title').value.trim() || t.title;
-  const tagsRaw = document.getElementById('edit-tags').value.trim();
-  t.priority_tags = tagsRaw ? tagsRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
-  await ensureLabelsExist(t.priority_tags);
+  t.priority_tags = getEditSelectedTags();
   t.due_date = document.getElementById('edit-due-date').value || null;
   t.due_time = document.getElementById('edit-due-time').value || null;
   t.location_trigger_id = document.getElementById('edit-location').value || null;
 
-  const freq = document.getElementById('edit-recurrence-freq').value;
+  const freq = document.querySelector('#edit-recurrence-segmented button.active')?.dataset.freq || '';
   if (!freq) {
     t.recurrence_rule = null;
   } else if (freq === 'custom') {
@@ -1030,9 +1106,31 @@ function setupTabs() {
 }
 
 function setupEditModal() {
-  document.getElementById('edit-recurrence-freq').addEventListener('change', e => {
-    document.getElementById('edit-recurrence-custom').classList.toggle('hidden', e.target.value !== 'custom');
+  document.querySelectorAll('#edit-date-chips .chip').forEach(chip => {
+    chip.addEventListener('click', () => applyDatePreset(chip.dataset.preset));
   });
+  document.getElementById('edit-due-date').addEventListener('change', syncDateChipActiveState);
+
+  document.getElementById('edit-more-toggle').addEventListener('click', () => {
+    const wrap = document.getElementById('edit-more-fields');
+    const isNowHidden = wrap.classList.toggle('hidden');
+    document.getElementById('edit-more-toggle').classList.toggle('expanded', !isNowHidden);
+  });
+
+  document.getElementById('edit-tags-trigger').addEventListener('click', () => {
+    document.getElementById('edit-tags-panel').classList.toggle('hidden');
+  });
+  document.addEventListener('click', e => {
+    const dropdown = document.getElementById('edit-tags-dropdown');
+    if (dropdown && !dropdown.contains(e.target)) {
+      document.getElementById('edit-tags-panel').classList.add('hidden');
+    }
+  });
+
+  document.querySelectorAll('#edit-recurrence-segmented button').forEach(btn => {
+    btn.addEventListener('click', () => setRecurrenceSegmented(btn.dataset.freq));
+  });
+
   document.getElementById('edit-task-form').addEventListener('submit', e => {
     e.preventDefault();
     saveEditModal();

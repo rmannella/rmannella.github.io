@@ -172,9 +172,14 @@
       <label class="field-label">Title
         <input id="edit-title" type="text" placeholder="Title">
       </label>
-      <label class="field-label">Priority tags
-        <input id="edit-tags" type="text" placeholder="comma separated">
-      </label>
+
+      <div class="field-label">Due date</div>
+      <div class="date-chip-row" id="edit-date-chips">
+        <button type="button" class="chip" data-preset="today">Today</button>
+        <button type="button" class="chip" data-preset="tomorrow">Tomorrow</button>
+        <button type="button" class="chip" data-preset="nextweek">Next week</button>
+        <button type="button" class="chip" data-preset="none">No date</button>
+      </div>
       <div class="edit-row">
         <label class="field-label">Due date
           <input id="edit-due-date" type="date">
@@ -183,28 +188,43 @@
           <input id="edit-due-time" type="time">
         </label>
       </div>
-      <label class="field-label">Location trigger
-        <select id="edit-location"></select>
-      </label>
-      <label class="field-label">Repeat
-        <select id="edit-recurrence-freq">
-          <option value="">Does not repeat</option>
-          <option value="daily">Daily</option>
-          <option value="weekly">Weekly</option>
-          <option value="custom">Custom</option>
-        </select>
-      </label>
-      <div id="edit-recurrence-custom" class="edit-row hidden">
-        <label class="field-label">Every
-          <input id="edit-recurrence-interval" type="number" min="1" value="1">
+
+      <button type="button" id="edit-more-toggle" class="more-toggle">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+        More options
+      </button>
+
+      <div id="edit-more-fields" class="edit-more-fields hidden">
+        <div class="field-label">Priority</div>
+        <div class="dropdown-multiselect" id="edit-tags-dropdown">
+          <button type="button" class="dropdown-trigger" id="edit-tags-trigger">Select labels</button>
+          <div class="dropdown-panel hidden" id="edit-tags-panel"></div>
+        </div>
+
+        <label class="field-label">Location trigger
+          <select id="edit-location"></select>
         </label>
-        <label class="field-label">Unit
-          <select id="edit-recurrence-unit">
-            <option value="day">day(s)</option>
-            <option value="week">week(s)</option>
-          </select>
-        </label>
+
+        <div class="field-label">Repeat</div>
+        <div class="segmented" id="edit-recurrence-segmented">
+          <button type="button" data-freq="">None</button>
+          <button type="button" data-freq="daily">Daily</button>
+          <button type="button" data-freq="weekly">Weekly</button>
+          <button type="button" data-freq="custom">Custom</button>
+        </div>
+        <div id="edit-recurrence-custom" class="edit-row hidden">
+          <label class="field-label">Every
+            <input id="edit-recurrence-interval" type="number" min="1" value="1">
+          </label>
+          <label class="field-label">Unit
+            <select id="edit-recurrence-unit">
+              <option value="day">day(s)</option>
+              <option value="week">week(s)</option>
+            </select>
+          </label>
+        </div>
       </div>
+
       <div class="modal-actions">
         <button type="button" id="edit-delete-btn" class="danger-btn">Delete task</button>
         <div class="modal-actions-right">
