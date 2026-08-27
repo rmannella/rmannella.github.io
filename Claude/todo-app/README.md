@@ -38,14 +38,17 @@ press-scale, and `:focus-visible` state.
   flow now. Browsers without `SpeechRecognition` (e.g. iOS Safari) get the
   manual field auto-expanded instead of a dead-end disabled circle.
 
-- **Tasks tab** shows every open task in one compact, single-line-first
-  list — today's and overdue tasks are pinned to the top, everything else
-  follows sorted by due date ascending (undated tasks last), rendered as
-  "Today" / "Tomorrow" / "Sat, Aug 22"-style friendly dates rather than raw
-  ISO strings (`friendlyDate()`/`friendlyTime()` in `js/app.js`). Priority
-  tags show as small colored dots rather than full pill badges; the ✎ / →
-  / ✕ row actions stay hidden until you hover a row (always visible on
-  touch devices, where hover doesn't apply). A single **Filters** button
+- **Tasks tab** shows every open task in one compact list — today's and
+  overdue tasks are pinned to the top, everything else follows sorted by
+  due date ascending (undated tasks last), rendered as "Today" / "Tomorrow"
+  / "Thurs 8/27/2026"-style friendly dates rather than raw ISO strings
+  (`friendlyDate()`/`friendlyTime()` in `js/app.js`; the weekday uses a
+  custom abbreviation list, `WEEKDAY_ABBR`, since `Thurs` isn't one of the
+  standard `Intl` 3-letter forms). Titles wrap onto multiple lines rather
+  than truncating. Priority tags show as small colored dots rather than
+  full pill badges; the → / ✕ row actions stay hidden until you hover a
+  row (always visible on touch devices, where hover doesn't apply). A
+  single **Filters** button
   above the list opens a small label-only filter panel (single-select) —
   there's no separate project filter anymore, since Projects were removed
   (see below). Tasks are added via a collapsed "+" trigger next to
@@ -57,9 +60,10 @@ press-scale, and `:focus-visible` state.
 
 - **Settings lives behind a gear icon** in the top-right of the header
   (`#settings-gear-btn`), not a tab — it's a separate concern from
-  Record/Tasks, the app's two main views. **Locations** and **Labels**
+  Record/Tasks, the app's two main views. **Labels** and **Locations**
   management (previously their own tabs) are now sub-sections inside
-  Settings, along with notifications, export/import, and a new
+  Settings — Labels first, since it's the more frequently used of the
+  two — along with notifications, export/import, and a new
   **default task time** field (see below).
 
 - **Projects have been removed.** The app now organizes tasks with
@@ -113,9 +117,29 @@ press-scale, and `:focus-visible` state.
   surfacing.
 - **Manual export/import** (Settings) as a JSON file — a practical
   stopgap for moving data between devices by hand.
+- **Rotating empty-state message**: when the open-task list is truly empty
+  (not just fully filtered/completed, which still says "All caught up for
+  now."), the placeholder text is picked from a small array
+  (`EMPTY_STATE_MESSAGES` in `js/app.js`), chosen deterministically by
+  day-of-epoch so it stays stable within a day rather than changing on
+  every re-render.
 - Installable PWA (`manifest.webmanifest`).
-- **Edit any task** after adding it (title, tags, due date/time, location
-  trigger, recurrence) via the ✎ button, which opens an edit sheet.
+- **Editing a task**: click its title to rename it in place (an inline
+  text input replaces the title, saved on blur/Enter, discarded on
+  Escape); double-click the title to open the full edit sheet instead.
+  There's no separate edit button anymore (a short click/double-click
+  debounce keeps a real double-click from triggering inline-edit first).
+  The edit sheet itself: Title and Due date (with Today/Tomorrow/Next
+  week/No date quick-pick chips) show by default; a "More options"
+  disclosure reveals Priority, Location trigger, and Repeat — it
+  auto-expands on open if the task already has any of those set, so
+  nothing already-configured is hidden without a hint. **Priority** is a
+  multi-select dropdown (`#edit-tags-trigger`/`#edit-tags-panel` in
+  `js/app.js`) listing your existing labels as checkboxes with their real
+  colors — it only lets you pick from labels that already exist; typing a
+  brand-new label name still works from the Tasks tab's quick-add bar
+  (`#task-tags`), unchanged. **Repeat** is a segmented control instead of
+  a dropdown.
 - **Manual drag-to-reorder** of open tasks (drag the ⠿ handle), backed by
   [SortableJS](https://github.com/SortableJS/Sortable) and a `sort_order`
   field on each task. Completed tasks stay pinned below and aren't
