@@ -1,10 +1,12 @@
-const CACHE_NAME = 'todoapp-shell-v10';
+const CACHE_NAME = 'todoapp-shell-v11';
 const SHELL_FILES = [
   '.',
   'index.html',
   'manifest.webmanifest',
   'css/styles.css',
   'js/db.js',
+  'js/sync-config.js',
+  'js/sync.js',
   'js/nlp.js',
   'js/geofence.js',
   'js/location-map.js',
@@ -16,6 +18,7 @@ const CDN_LIB_FILES = [
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
   'https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js',
+  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js',
 ];
 
 self.addEventListener('install', event => {

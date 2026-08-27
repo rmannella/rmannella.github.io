@@ -111,6 +111,11 @@
       </label>
     </div>
     <div class="settings-row">
+      <button id="sync-signin-btn" class="secondary-btn hidden">Sign in with Google</button>
+      <button id="sync-signout-btn" class="secondary-btn hidden">Sign out</button>
+      <span id="sync-status" class="hint"></span>
+    </div>
+    <div class="settings-row">
       <button id="notif-btn" class="primary-btn">Enable notifications</button>
       <span id="notif-status" class="hint"></span>
     </div>
@@ -121,7 +126,7 @@
       <label for="import-input" class="secondary-btn file-label">Import backup (JSON)</label>
       <input id="import-input" type="file" accept="application/json" hidden>
     </div>
-    <p class="hint">
+    <p class="hint" id="sync-hint">
       All data is stored locally on this device only. There is no account sync
       between devices yet — see the project README for what's needed to add
       real cross-device sync.
@@ -259,7 +264,10 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="js/db.js"></script>
+<script src="js/sync-config.js"></script>
+<script src="js/sync.js"></script>
 <script src="js/nlp.js"></script>
 <script src="js/geofence.js"></script>
 <script src="js/location-map.js"></script>
