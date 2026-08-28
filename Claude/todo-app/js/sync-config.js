@@ -4,6 +4,6 @@
 // Row Level Security on each table is what actually protects your data,
 // not the secrecy of this key.
 window.SUPABASE_CONFIG = {
-  url: '',      // e.g. https://xxxxxxxx.supabase.co
-  anonKey: '',  // the "anon public" key from Project Settings -> API
+  url: 'https://obgajiggexhtvxvcufcn.supabase.co',
+  anonKey: 'sb_publishable_BBuhMev3btYeKuq4nor4sw_ybnb5PTN', // modern publishable key (drop-in replacement for the legacy anon JWT)
 };
