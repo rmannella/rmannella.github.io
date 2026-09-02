@@ -404,6 +404,7 @@ select {
   transition: box-shadow var(--transition-base), transform var(--transition-base);
 }
 
+
 @media (hover: hover) and (pointer: fine) {
   .task-row:hover,
   .list-row:hover {
@@ -555,9 +556,35 @@ select {
   padding: var(--space-3) var(--space-4);
 }
 
-.list-row > span:not(.swatch) {
+.list-row-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  cursor: pointer;
+}
+
+.list-row-title {
   font-family: var(--font-serif);
   font-size: var(--text-base);
+}
+
+.list-row-sub {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+/* A location the parser created from speech has no address yet and cannot
+   trigger anything until one is set. */
+.list-row-sub-warn {
+  color: var(--record);
+}
+
+.list-row > .list-row-title {
+  flex: 1;
+  min-width: 0;
 }
 
 .swatch {
@@ -988,13 +1015,85 @@ select {
   border: 1px solid var(--border);
 }
 
-.coord-row {
+.location-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-2);
+  align-items: center;
 }
 
-.coord-row input {
-  flex: 1;
+.location-actions .primary-btn {
+  margin-left: auto;
+}
+
+/* The resolved address, shown in place of the raw coordinates the picker
+   used to expose. */
+#location-pin-hint.location-pin-set {
+  color: var(--accent-strong);
+  font-weight: 500;
+}
+
+/* A small sage dot in place of the 📍 emoji, which renders bright red and
+   fights the map right above it. */
+#location-pin-hint.location-pin-set::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: var(--space-2);
+  border-radius: 50%;
+  background: var(--accent);
+  vertical-align: middle;
+}
+
+.secondary-btn.hidden {
+  display: none;
+}
+
+/* Map theming: CARTO's light basemap is neutral grey, so it gets warmed and
+   desaturated here to sit inside the app's ivory/sage palette rather than
+   reading as a pasted-in widget. */
+.location-map .leaflet-tile-pane {
+  filter: sepia(0.22) saturate(0.78) brightness(1.03) contrast(0.96);
+}
+
+.location-map .leaflet-container {
+  background: var(--done-bg);
+  font-family: var(--font-sans);
+}
+
+.location-map .map-pin {
+  /* divIcon ships with a white box and border by default. */
+  background: none;
+  border: none;
+  filter: drop-shadow(0 2px 3px rgba(43, 32, 21, 0.28));
+}
+
+.location-map .leaflet-control-zoom a {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--border);
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.location-map .leaflet-control-zoom a:hover {
+  background: var(--accent-tint);
+  color: var(--accent-strong);
+}
+
+.location-map .leaflet-bar {
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-card);
+}
+
+.location-map .leaflet-control-attribution {
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.location-map .leaflet-control-attribution a {
+  color: var(--accent-strong);
 }
 
 /* Record screen */

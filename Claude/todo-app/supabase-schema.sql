@@ -34,6 +34,7 @@ create table public.locations (
   id text not null,
   user_id uuid not null references auth.users(id) on delete cascade,
   label text,
+  address text,
   lat double precision,
   lng double precision,
   updated_at timestamptz,
@@ -77,3 +78,6 @@ begin
     execute format('create index %I on public.%I(user_id)', t || '_user_id_idx', t);
   end loop;
 end $$;
+
+-- Applied separately for projects created before locations stored addresses:
+--   alter table public.locations add column if not exists address text;

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'todoapp-shell-v12';
+const CACHE_NAME = 'todoapp-shell-v13';
 const SHELL_FILES = [
   '.',
   'index.html',
@@ -7,9 +7,15 @@ const SHELL_FILES = [
   'js/db.js',
   'js/sync-config.js',
   'js/sync.js',
+  'js/util.js',
   'js/nlp.js',
+  'js/store.js',
   'js/geofence.js',
-  'js/location-map.js',
+  'js/map.js',
+  'js/ui-shell.js',
+  'js/ui-tasks.js',
+  'js/ui-settings.js',
+  'js/ui-record.js',
   'js/app.js',
   'icons/icon.svg',
 ];

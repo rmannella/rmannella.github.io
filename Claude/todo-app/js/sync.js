@@ -32,11 +32,17 @@
   // ---- wrap DB.put / DB.remove (installed immediately, before app.js's
   // init() runs) ----
   const rawPut = DB.put.bind(DB);
+  const rawPutMany = DB.putMany.bind(DB);
   const rawRemove = DB.remove.bind(DB);
 
   DB.put = async function (storeName, value) {
     const result = await rawPut(storeName, value);
     if (STORES.includes(storeName)) pushToRemote(storeName, value);
+    return result;
+  };
+  DB.putMany = async function (storeName, values) {
+    const result = await rawPutMany(storeName, values);
+    if (STORES.includes(storeName)) values.forEach(v => pushToRemote(storeName, v));
     return result;
   };
   DB.remove = async function (storeName, id) {
@@ -48,7 +54,7 @@
   // Apply incoming pull/realtime data through these instead of the wrapped
   // versions above, so applying a remote change never re-triggers a push
   // back to Supabase (no echo loop).
-  const raw = { put: rawPut, remove: rawRemove };
+  const raw = { put: rawPut, putMany: rawPutMany, remove: rawRemove };
 
   // ---- delete outbox (localStorage) — covers offline/failed soft-deletes ----
   function readOutbox() {
@@ -113,6 +119,14 @@
   }
 
   // ---- pull + merge ----
+
+  // Store comes from a later script tag (sync.js has to install its DB wrapper
+  // first) and is a top-level `const`, which lives in the global lexical scope
+  // rather than on `window` -- so it is referenced directly, at call time.
+  async function reloadApp() {
+    if (typeof Store !== 'undefined' && typeof Store.refresh === 'function') await Store.refresh();
+  }
+
   function ts(x) {
     return x ? new Date(x).getTime() : 0;
   }
@@ -159,8 +173,7 @@
       }
     }
     await flushDeleteOutbox();
-    if (typeof loadAll === 'function') await loadAll();
-    if (typeof render === 'function') render();
+    await reloadApp();
   }
 
   // ---- realtime ----
@@ -187,8 +200,7 @@
     if (!row) return;
     if (row.deleted_at) await raw.remove(storeName, row[keyField]);
     else await raw.put(storeName, stripUserId(row));
-    if (typeof loadAll === 'function') await loadAll();
-    if (typeof render === 'function') render();
+    await reloadApp();
   }
 
   // ---- auth ----

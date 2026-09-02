@@ -145,25 +145,24 @@
 
     <div class="settings-section">
       <h3>Locations</h3>
-      <p class="hint">Geofence radius is fixed at ~150m for all locations.</p>
+      <p class="hint">Reminders trigger when you come within about 150m of the address.</p>
       <form id="add-location-form" class="location-form">
-        <input id="location-name-input" type="text" placeholder="Label (e.g. Home)">
+        <input id="location-name-input" type="text" placeholder="Name (e.g. Home)" autocomplete="off">
 
         <div class="address-search-row">
-          <input id="location-address-input" type="text" placeholder="Search an address">
+          <input id="location-address-input" type="text" placeholder="Street address, city" autocomplete="off">
           <button type="button" id="address-search-btn" class="secondary-btn">Search</button>
         </div>
         <div id="address-results" class="address-results hidden"></div>
 
         <div id="location-map" class="location-map"></div>
-        <p class="hint">Tap or drag the pin on the map to set the exact spot.</p>
+        <p class="hint" id="location-pin-hint">Search an address, or tap the map to drop a pin.</p>
 
-        <div class="coord-row">
-          <input id="location-lat-input" type="text" placeholder="Lat" inputmode="decimal">
-          <input id="location-lng-input" type="text" placeholder="Lng" inputmode="decimal">
-          <button type="button" id="use-current-location-btn" class="icon-btn" title="Use current location">📍</button>
+        <div class="location-actions">
+          <button type="button" id="use-current-location-btn" class="secondary-btn">Use my current location</button>
+          <button type="button" id="location-cancel-btn" class="secondary-btn hidden">Cancel</button>
+          <button type="submit" id="location-submit-btn" class="primary-btn">Add location</button>
         </div>
-        <button type="submit" class="primary-btn">Add location</button>
       </form>
       <div id="locations-list" class="list"></div>
     </div>
@@ -265,12 +264,20 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<!-- Load order matters: db.js defines DB, sync.js wraps its write methods
+     before anything can write, then state, then the UI, then bootstrap. -->
 <script src="js/db.js"></script>
 <script src="js/sync-config.js"></script>
 <script src="js/sync.js"></script>
+<script src="js/util.js"></script>
 <script src="js/nlp.js"></script>
+<script src="js/store.js"></script>
 <script src="js/geofence.js"></script>
-<script src="js/location-map.js"></script>
+<script src="js/map.js"></script>
+<script src="js/ui-shell.js"></script>
+<script src="js/ui-tasks.js"></script>
+<script src="js/ui-settings.js"></script>
+<script src="js/ui-record.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

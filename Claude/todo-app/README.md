@@ -5,6 +5,33 @@ the branch/issue history). No build step: it's plain HTML/CSS/JS served
 directly from this folder, so it deploys automatically wherever this repo
 is published — no separate CI workflow needed.
 
+## Architecture
+
+Plain global-scope scripts, no bundler, loaded in dependency order from
+`index.html`. Each file owns one thing:
+
+| File | Responsibility |
+| --- | --- |
+| `js/db.js` | IndexedDB wrapper. Generic over stores, one transaction per call. Knows nothing about tasks. |
+| `js/sync-config.js` / `js/sync.js` | Optional Supabase sync. Wraps `DB.put`/`DB.putMany`/`DB.remove`; fully inert when unconfigured. |
+| `js/util.js` | Pure helpers: local-time dates, friendly formatting, DOM construction. |
+| `js/nlp.js` | Free-text/voice parser. Pure functions, no DOM, no state. |
+| `js/store.js` | **The only owner of state and the only writer to `DB`.** Every mutation reports which collections it touched. |
+| `js/geofence.js` | Position watcher; calls back on arrival. |
+| `js/map.js` | Leaflet picker + address geocoding/reverse-geocoding. |
+| `js/ui-shell.js` | Toasts, tabs, modal plumbing, the `UI.guard()` error wrapper. |
+| `js/ui-tasks.js`, `js/ui-settings.js`, `js/ui-record.js` | One screen each. Subscribe to the store; never write to `DB` directly. |
+| `js/app.js` | Bootstrap and background jobs only (~100 lines). |
+
+Two rules hold the whole thing together:
+
+1. **UI never writes to the database.** It calls `Store.*`, which persists and
+   then emits the names of the collections that changed. A screen redraws only
+   the sections whose data actually moved, instead of everything redrawing on
+   every keystroke-sized change.
+2. **All user text goes through `textContent`** (`el()` in `js/util.js`), so a
+   task title or label name can never be interpreted as markup.
+
 ## Design system
 
 `css/styles.css` is built on a small token system (`:root`): a sage-green
@@ -25,8 +52,7 @@ press-scale, and `:focus-visible` state.
 ## What's actually implemented
 
 - **Record — the default landing screen.** A large press-and-hold circle
-  (`#record-btn` in `index.html`, wired in `js/app.js`'s
-  `setupRecordButton()`) is now the app's front door: hold it, speak, let
+  (`#record-btn` in `index.html`, wired in `js/ui-record.js`) is now the app's front door: hold it, speak, let
   go — the button turns a muted "on air" red with expanding ripple rings,
   a pulsing REC badge, and a soundwave glyph swapped in for the mic icon
   while held, then settles with a quick pulse back to idle once the task
@@ -42,7 +68,7 @@ press-scale, and `:focus-visible` state.
   overdue tasks are pinned to the top, everything else follows sorted by
   due date ascending (undated tasks last), rendered as "Today" / "Tomorrow"
   / "Thurs 8/27/2026"-style friendly dates rather than raw ISO strings
-  (`friendlyDate()`/`friendlyTime()` in `js/app.js`; the weekday uses a
+  (`friendlyDate()`/`friendlyTime()` in `js/util.js`; the weekday uses a
   custom abbreviation list, `WEEKDAY_ABBR`, since `Thurs` isn't one of the
   standard `Intl` 3-letter forms). Titles wrap onto multiple lines rather
   than truncating. Priority tags show as small colored dots rather than
@@ -56,7 +82,7 @@ press-scale, and `:focus-visible` state.
   after a successful add. Auto-rollover keeps overdue open tasks pinned at
   the top day after day, and completed tasks stay struck through until
   midnight, then archive (purged 30 days after completion) — all via
-  `js/app.js` + IndexedDB (`js/db.js`).
+  `js/store.js` + IndexedDB (`js/db.js`).
 
 - **Settings lives behind a gear icon** in the top-right of the header
   (`#settings-gear-btn`), not a tab — it's a separate concern from
@@ -91,7 +117,7 @@ press-scale, and `:focus-visible` state.
   separately) to get multiple tasks from one capture.
 - **Location phrases auto-create a real location.** Saying "when I get to
   work" (or any other not-yet-saved place — "the dentist", "the gym") now
-  creates a real Location row immediately (coordinates left blank) and
+  creates a real Location row immediately (address left blank) and
   links the task to it, instead of leaving a dead-end text hint on the
   task. The new location shows up under Settings → Locations flagged
   "needs an address" — filling in an address there (via the existing
@@ -103,11 +129,12 @@ press-scale, and `:focus-visible` state.
   the same `SpeechRecognition` API (Chrome on Android supports this) —
   transcript is fed through the same parser as text entry. Kept as a
   secondary path now that Record is the primary one.
-- **Named locations** with lat/lng (150m fixed radius, matches spec) and a
-  **foreground geofence check** (`js/geofence.js`) that fires a
-  notification when you enter a saved location's radius while the app is
-  open. Locations without coordinates yet (see auto-create above) are
-  skipped by the geofence check rather than erroring.
+- **Named locations, identified by street address** (150m fixed radius,
+  matches spec) and a **foreground geofence check** (`js/geofence.js`) that
+  fires a notification when you enter a saved location's radius while the
+  app is open. See "Locations are addresses" below. Locations with no
+  address yet (see auto-create above) are skipped by the geofence check
+  rather than erroring.
 - **Time-based notifications** for tasks with a due time, checked locally.
 - **Offline support**: all data lives in IndexedDB; the service worker
   (`sw.js`) caches the app shell so the whole app loads with no network.
@@ -150,12 +177,13 @@ press-scale, and `:focus-visible` state.
   precedence over `sort_order` there.
 - **Address search and map pin** for locations, via
   [Leaflet](https://leafletjs.com/) (map/pin UI) and
-  [OpenStreetMap Nominatim](https://nominatim.org/) (free geocoding, no API
-  key). Both load from CDN and are precached by the service worker for
-  offline *use of the library code*, but actual searches and map tiles
-  still need a live connection. Nominatim's usage policy caps this at
-  light, interactive use (no bulk geocoding) — fine for a personal app,
-  not something to scale up without switching to a paid provider.
+  [OpenStreetMap Nominatim](https://nominatim.org/) (free geocoding *and*
+  reverse-geocoding, no API key). Both load from CDN and are precached by
+  the service worker for offline *use of the library code*, but actual
+  searches and map tiles still need a live connection. Nominatim's usage
+  policy caps this at light, interactive use (no bulk geocoding) — fine for
+  a personal app, not something to scale up without switching to a paid
+  provider; `js/map.js` throttles requests to stay inside it.
 - Logo in the header, pulled from `/images/logo.png` (the same file the
   main site uses) rather than duplicated into this folder — given a black
   badge background since the artwork is white-on-transparent (designed for
@@ -274,6 +302,54 @@ Separately, `sort_order` itself only determines order within the pinned
 today/overdue group at the top of the list — tasks below that are always
 ordered by due date, so dragging one of them has no visible effect after
 the next render.
+
+## Locations are addresses
+
+A location is a **name plus a street address** — "Home", "350 5th Ave, New
+York, NY". Coordinates still exist in the record because the geofence needs
+something to measure against, but they are never shown or typed: they are
+resolved from the address you search, or reverse-geocoded from a pin you drop
+on the map. Geocoding uses OpenStreetMap's Nominatim, throttled to its
+one-request-per-second policy in `js/map.js`.
+
+The map is themed to the app rather than dropped in raw: CARTO's light
+basemap, warmed and desaturated into the ivory/sage palette by a CSS filter
+on the tile pane, with the marker and the 150m geofence ring drawn from the
+live `--accent` design token (read at runtime in `js/map.js`, so they can't
+drift out of step with the stylesheet). The ring is also functional — it
+shows the actual radius that will trigger the reminder.
+
+Saying "remind me when I get to the dentist" still auto-creates a location
+named *Dentist* with no address. It shows in Settings → Locations flagged
+**"No address yet"**; tapping it loads it back into the form so you can
+search an address and save it in place. Until then it simply never triggers.
+
+## Feature recommendations
+
+Three things this app is now well-shaped to add, roughly in order of
+value-for-effort:
+
+1. **Snooze / defer presets on the row.** The `→` action only ever pushes to
+   tomorrow. A long-press (or a small menu) offering "this evening / this
+   weekend / next week" would cover most of what the edit card gets opened
+   for. `Store.pushToTomorrow()` is already a one-line wrapper over
+   `updateTask({ due_date })`, so this is UI work, not data work.
+2. **A weekly review screen.** The `digests` store already records completed
+   and pushed counts per day and nothing reads it. A simple week view —
+   what got done, what keeps getting pushed — would surface the tasks that
+   are silently rotting at the bottom of the list. Repeatedly-deferred tasks
+   are the single most useful signal a to-do app can give you.
+3. **Server-side reminders via a Supabase Edge Function.** Time reminders
+   currently only fire while the app is open, which is the biggest real gap.
+   Now that tasks sync to Postgres, a scheduled Edge Function could send Web
+   Push for anything due — this is the one change that would make the app
+   trustworthy enough to stop double-booking reminders in your phone's
+   clock app.
+
+Two smaller ones worth noting: **task search** (trivial now that filtering
+lives behind one `Store` predicate), and **sub-tasks / checklists** for
+things like a punch list, which would need a `parent_id` column but no other
+structural change.
 
 ## Running locally
 
