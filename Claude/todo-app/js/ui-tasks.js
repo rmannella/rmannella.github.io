@@ -15,9 +15,11 @@ const TasksUI = (() => {
   const DOUBLE_CLICK_MS = 250;
 
   let sortable = null;
+  let expanded = new Set(); // parent task ids whose steps are showing
   let editingTitleId = null; // task whose title is being edited inline
   let pendingDelete = null; // { task, timeoutId } — soft-deleted, undoable
   let titleClickTimer = null;
+  let addingStepFor = null; // parent id whose step input should regain focus
 
   function emptyStateMessage() {
     return EMPTY_STATE_MESSAGES[Math.floor(Date.now() / 86400000) % EMPTY_STATE_MESSAGES.length];
@@ -142,6 +144,59 @@ const TasksUI = (() => {
     return input;
   }
 
+  /* ---------- subtasks ---------- */
+
+  function subtaskRow(child) {
+    const row = el('div', 'subtask-row' + (child.status === 'completed' ? ' subtask-done' : ''));
+
+    const check = el('input', 'task-checkbox subtask-checkbox', null, {
+      type: 'checkbox',
+      checked: child.status === 'completed',
+    });
+    check.addEventListener('change', UI.guard(() => Store.toggleComplete(child.id)));
+    row.appendChild(check);
+
+    if (editingTitleId === child.id) {
+      row.appendChild(titleInput(child));
+    } else {
+      const title = el('span', 'subtask-title', child.title);
+      title.addEventListener('click', () => startInlineEdit(child.id));
+      row.appendChild(title);
+    }
+
+    row.appendChild(
+      iconButton('✕', 'Delete step', UI.guard(() => Store.removeTask(child.id)))
+    );
+    return row;
+  }
+
+  function subtaskPanel(parent) {
+    const panel = el('div', 'subtask-panel');
+    Store.subtasks(parent.id).forEach(child => panel.appendChild(subtaskRow(child)));
+
+    const form = el('form', 'subtask-add');
+    const input = el('input', 'subtask-add-input', null, {
+      type: 'text',
+      placeholder: 'Add a step…',
+      autocomplete: 'off',
+    });
+    form.appendChild(input);
+    form.addEventListener(
+      'submit',
+      UI.guard(async e => {
+        e.preventDefault();
+        const value = input.value.trim();
+        if (!value) return;
+        input.value = '';
+        // Keep focus so a checklist can be typed straight through.
+        addingStepFor = parent.id;
+        await Store.addSubtask(parent.id, value);
+      }, 'Could not add that step.')
+    );
+    panel.appendChild(form);
+    return panel;
+  }
+
   /* ---------- rows ---------- */
 
   function metaBits(task) {
@@ -192,6 +247,21 @@ const TasksUI = (() => {
       });
       content.appendChild(title);
 
+      const progress = Store.subtaskProgress(task.id);
+      if (progress) {
+        const chip = el(
+          'button',
+          'subtask-progress' + (expanded.has(task.id) ? ' expanded' : ''),
+          `${progress.done}/${progress.total}`,
+          { type: 'button', title: 'Show steps' }
+        );
+        chip.addEventListener('click', e => {
+          e.stopPropagation();
+          toggleExpanded(task.id);
+        });
+        content.appendChild(chip);
+      }
+
       const bits = metaBits(task);
       if (bits.length) {
         const overdue = !!task.due_date && task.due_date < todayKey() && task.status === 'open';
@@ -210,10 +280,31 @@ const TasksUI = (() => {
         iconButton('→', 'Push to tomorrow', UI.guard(() => Store.pushToTomorrow(task.id)))
       );
     }
+    if (task.status !== 'completed') {
+      actions.appendChild(
+        iconButton('☰', 'Add a step', () => {
+          expanded.add(task.id);
+          addingStepFor = task.id;
+          renderList();
+        })
+      );
+    }
     actions.appendChild(iconButton('✕', 'Delete', () => deleteTask(task.id)));
     row.appendChild(actions);
 
+    // Steps render inside the row so they move with it when dragged and can
+    // never be orphaned from their parent.
+    if (expanded.has(task.id) && editingTitleId !== task.id) {
+      row.appendChild(subtaskPanel(task));
+    }
+
     return row;
+  }
+
+  function toggleExpanded(id) {
+    if (expanded.has(id)) expanded.delete(id);
+    else expanded.add(id);
+    renderList();
   }
 
   /* ---------- rendering ---------- */
@@ -266,6 +357,15 @@ const TasksUI = (() => {
       ]);
     }
     replaceChildren(doneList, done.map(t => taskRow(t, false)));
+
+    // Re-focus the step input after the re-render a save triggers, so a
+    // checklist can be typed straight through without reaching for the mouse.
+    if (addingStepFor) {
+      const parentRow = openList.querySelector(`.task-row[data-id="${addingStepFor}"]`);
+      const input = parentRow && parentRow.querySelector('.subtask-add-input');
+      addingStepFor = null;
+      if (input) input.focus();
+    }
 
     ensureSortable();
   }

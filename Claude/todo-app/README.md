@@ -14,6 +14,7 @@ Plain global-scope scripts, no bundler, loaded in dependency order from
 | --- | --- |
 | `js/db.js` | IndexedDB wrapper. Generic over stores, one transaction per call. Knows nothing about tasks. |
 | `js/sync-config.js` / `js/sync.js` | Optional Supabase sync. Wraps `DB.put`/`DB.putMany`/`DB.remove`; fully inert when unconfigured. |
+| `js/push-config.js` / `js/push.js` | Optional Web Push registration. Fully inert with no VAPID key configured; requires sync + sign-in. |
 | `js/util.js` | Pure helpers: local-time dates, friendly formatting, DOM construction. |
 | `js/nlp.js` | Free-text/voice parser. Pure functions, no DOM, no state. |
 | `js/store.js` | **The only owner of state and the only writer to `DB`.** Every mutation reports which collections it touched. |
@@ -21,6 +22,7 @@ Plain global-scope scripts, no bundler, loaded in dependency order from
 | `js/map.js` | Leaflet picker + address geocoding/reverse-geocoding. |
 | `js/ui-shell.js` | Toasts, tabs, modal plumbing, the `UI.guard()` error wrapper. |
 | `js/ui-tasks.js`, `js/ui-settings.js`, `js/ui-record.js` | One screen each. Subscribe to the store; never write to `DB` directly. |
+| `supabase/functions/send-reminders/` | The server side of Web Push: a scheduled Edge Function, not part of the client bundle. |
 | `js/app.js` | Bootstrap and background jobs only (~100 lines). |
 
 Two rules hold the whole thing together:
@@ -135,7 +137,22 @@ press-scale, and `:focus-visible` state.
   app is open. See "Locations are addresses" below. Locations with no
   address yet (see auto-create above) are skipped by the geofence check
   rather than erroring.
-- **Time-based notifications** for tasks with a due time, checked locally.
+- **Sub-tasks / checklists.** Any task can hold a short list of steps: an
+  overflow-menu action ("Add a step") on the row expands a checklist panel
+  in place, and once one exists a small `2/5`-style progress chip appears
+  next to the title — click it to expand or collapse. Steps have their own
+  checkbox and delete action; typing one and hitting Enter re-focuses the
+  input so a whole list can be typed straight through. One level deep only
+  (a step can't have its own steps), and children are excluded from the
+  main list's filters/sort — they only ever render inside their parent's
+  row, including while it's being dragged. Completing the parent completes
+  any steps still open (the reverse is deliberately not automatic — you
+  can watch a checklist fill up without the parent auto-closing); deleting
+  the parent deletes its steps; a recurring parent's next occurrence gets
+  a fresh copy of the same steps, all unticked (`js/store.js`'s
+  `subtasks()`/`addSubtask()`/`subtaskProgress()`, `parent_id` on `tasks`).
+- **Time-based notifications** for tasks with a due time, checked locally
+  while the app is open, and via Web Push when it's closed — see below.
 - **Offline support**: all data lives in IndexedDB; the service worker
   (`sw.js`) caches the app shell so the whole app loads with no network.
 - **Daily/weekly digest tracking**: completed vs. pushed counts are still
@@ -235,9 +252,9 @@ dashboards — none of it can be automated from here):
 1. Create a free project at [supabase.com](https://supabase.com).
 2. Open the SQL Editor and run everything in
    [`supabase-schema.sql`](./supabase-schema.sql) (in this folder) —
-   creates the four tables (`tasks`, `locations`, `labels`, `digests`)
-   with Row Level Security so each signed-in user only ever sees their
-   own rows.
+   creates the five tables (`tasks`, `locations`, `labels`, `digests`,
+   `push_subscriptions`) with Row Level Security so each signed-in user
+   only ever sees their own rows.
 3. Note the OAuth callback URL shown on Authentication → Providers:
    `https://<project-ref>.supabase.co/auth/v1/callback`.
 4. In the [Google Cloud Console](https://console.cloud.google.com/):
@@ -270,16 +287,122 @@ dashboards — none of it can be automated from here):
 week with no activity. `.github/workflows/keep-supabase-awake.yml` pings
 the project's REST API every 3 days (via `workflow_dispatch`-triggerable
 GitHub Actions cron) to keep that from happening — it's a no-op until you
-add the two repo secrets in step 9 above.
+add the two repo secrets in step 9 above. Once reminders (below) are set
+up, the once-a-minute cron job pinging the Edge Function keeps the
+project awake on its own and this workflow becomes redundant, though
+there's no harm leaving it enabled.
+
+## Reminders that arrive when the app is closed
+
+Everything else in this app only runs while a tab or the installed PWA is
+open — the in-page reminder loop, the geofence check, all of it. This is
+the one piece that works when the app is fully closed: a scheduled
+Supabase job checks for due tasks once a minute and sends a real
+[Web Push](https://developer.mozilla.org/en-US/docs/Web/API/Push_API)
+notification to every device you've enabled it on, the same way a native
+app would.
+
+**Requires cross-device sync to already be set up** (above) — a push
+subscription is stored per Google account, not per device in isolation,
+so there has to be an account to store it against.
+
+**How it's built:**
+- `js/push.js` registers the browser's `PushManager` and hands the
+  subscription to `Sync.savePushSubscription()`, which stores it in the
+  `push_subscriptions` table via RLS (so nobody but that user can read or
+  write their own subscription rows).
+- Every task write goes through `Store.newTask()`/`Store.updateTask()`
+  in `js/store.js`, which resolve `due_date`+`due_time` (local wall-clock
+  strings — the only way to know what "3pm" means is in the timezone
+  that wrote it) into an absolute `due_at` timestamp column. That's what
+  a server-side job can actually query against.
+- [`supabase/functions/send-reminders/index.ts`](./supabase/functions/send-reminders/index.ts)
+  is a Supabase Edge Function: it selects open tasks with `due_at` in the
+  past and `push_sent_at` still null, sends each a Web Push message
+  (VAPID-signed, via the `web-push` npm package running under Deno) to
+  every subscription on that account, marks `push_sent_at` once at least
+  one device received it, and prunes subscriptions the push service
+  reports as gone (410/404 — the browser threw them away). A task more
+  than 6 hours overdue is marked sent without pushing, rather than
+  surprising you with a stale reminder hours later.
+- A `pg_cron` job (`send-task-reminders`) calls that function once a
+  minute via `pg_net`; the shared secret it authenticates with is read
+  from Supabase Vault at call time so it never appears in plaintext in
+  `cron.job` or migration history.
+- `sw.js`'s `push` event handler shows the notification (works even if
+  no tab is open); its `pushsubscriptionchange` handler re-subscribes
+  automatically if the push service ever rotates the endpoint, and hands
+  the new one to any open tab to re-save.
+
+**Setting it up** (one-time, after cross-device sync above is working):
+
+1. Generate a VAPID keypair — run this once, anywhere with Node:
+   ```
+   npx web-push generate-vapid-keys
+   ```
+2. Paste the **public** key into `js/push-config.js`'s `vapidPublicKey`
+   (safe to commit — it's how a browser verifies a push actually came
+   from this app) and deploy (commit + push).
+3. In Supabase → Edge Functions → `send-reminders` → Secrets, add:
+   - `VAPID_PUBLIC_KEY` — the same public key from step 1
+   - `VAPID_PRIVATE_KEY` — the **private** key from step 1 (never commit
+     this anywhere — it's what lets the server sign as this app)
+   - `VAPID_CONTACT` — `mailto:you@example.com`, the contact a push
+     service can reach you at if it needs to (required by the Web Push
+     spec)
+   - `REMINDER_SECRET` — any long random string you generate yourself;
+     this is what stops a stranger from hitting the function URL and
+     spamming every user's devices
+4. Store that same `REMINDER_SECRET` value in Supabase Vault (SQL
+   Editor), so the cron job can read it without it ever appearing in
+   plaintext:
+   ```sql
+   select vault.create_secret('<the same random string from step 3>', 'reminder_secret');
+   ```
+5. Enable the scheduler extensions and create the cron job — run once in
+   the SQL Editor (also included, commented, at the bottom of
+   `supabase-schema.sql`):
+   ```sql
+   create extension if not exists pg_cron with schema pg_catalog;
+   create extension if not exists pg_net with schema extensions;
+
+   select cron.schedule(
+     'send-task-reminders',
+     '* * * * *',
+     $$
+     select net.http_post(
+       url := '<your project URL>/functions/v1/send-reminders',
+       headers := jsonb_build_object(
+         'Content-Type', 'application/json',
+         'x-reminder-secret', (select decrypted_secret from vault.decrypted_secrets where name = 'reminder_secret')
+       ),
+       body := '{}'::jsonb
+     );
+     $$
+   );
+   ```
+6. Deploy the function itself from this folder with the Supabase CLI:
+   ```
+   supabase functions deploy send-reminders --project-ref <project-ref> --no-verify-jwt
+   ```
+   (`--no-verify-jwt` because this endpoint authenticates via the shared
+   secret above, not a user's session — there is no user in the loop,
+   the caller is a cron job.)
+7. Open the app → Settings → sign in with Google if you haven't, then
+   "Send reminders to this device" → accept the browser's notification
+   permission prompt.
+8. Add a task due a minute or two from now and leave the tab closed —
+   the notification should arrive without the app open.
+
+If the button in Settings stays disabled with "Sign in with Google
+first," that's step 7's actual order, not a bug — a subscription needs
+an account to attach to. If notifications never arrive, the most likely
+cause is step 3 or 4 being incomplete: the cron job runs every minute
+regardless, but silently gets a 401 from the function until the secret
+matches on both sides.
 
 ## What's intentionally NOT implemented (needs infra beyond this app)
 
-- **True background push notifications.** `Notification`/`showNotification`
-  here only fire while the app (tab or installed PWA) is open or recently
-  active — there's no push server sending Web Push messages, so nothing
-  wakes the app when it's fully closed. Real background delivery needs
-  VAPID keys and a push subscription per device, wired through a backend
-  (Supabase Edge Functions could host this later, but it isn't built).
 - **Background geofencing.** The location check in `js/geofence.js` uses
   `watchPosition`, which only runs while the page is open. Real
   arrive-and-notify-even-when-closed behavior needs either a native
@@ -339,17 +462,21 @@ value-for-effort:
    what got done, what keeps getting pushed — would surface the tasks that
    are silently rotting at the bottom of the list. Repeatedly-deferred tasks
    are the single most useful signal a to-do app can give you.
-3. **Server-side reminders via a Supabase Edge Function.** Time reminders
-   currently only fire while the app is open, which is the biggest real gap.
-   Now that tasks sync to Postgres, a scheduled Edge Function could send Web
-   Push for anything due — this is the one change that would make the app
-   trustworthy enough to stop double-booking reminders in your phone's
-   clock app.
+3. **Location-triggered push, not just time-triggered.** `send-reminders`
+   only ever looks at `due_at`; arriving somewhere still depends on
+   `js/geofence.js`'s foreground `watchPosition` check, which stops the
+   moment the tab closes. A companion Edge Function on a tighter schedule
+   (or the [Geolocation background sync patterns Chrome supports on
+   Android](https://developer.chrome.com/docs/capabilities/geolocation))
+   reading each account's last known position against `locations.lat/lng`
+   would close the other half of the reminder story the same way
+   `send-reminders` just closed the time half.
 
 Two smaller ones worth noting: **task search** (trivial now that filtering
-lives behind one `Store` predicate), and **sub-tasks / checklists** for
-things like a punch list, which would need a `parent_id` column but no other
-structural change.
+lives behind one `Store` predicate), and **a "snoozed reminder already
+sent" indicator** on the row — `push_sent_at` is tracked but nothing in
+the UI currently shows it, so there's no way to tell from the list alone
+whether a device already buzzed for a task.
 
 ## Running locally
 

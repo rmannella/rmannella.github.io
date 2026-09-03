@@ -1,4 +1,4 @@
-const CACHE_NAME = 'todoapp-shell-v13';
+const CACHE_NAME = 'todoapp-shell-v14';
 const SHELL_FILES = [
   '.',
   'index.html',
@@ -7,6 +7,8 @@ const SHELL_FILES = [
   'js/db.js',
   'js/sync-config.js',
   'js/sync.js',
+  'js/push-config.js',
+  'js/push.js',
   'js/util.js',
   'js/nlp.js',
   'js/store.js',
@@ -64,6 +66,47 @@ self.addEventListener('fetch', event => {
         return response;
       }).catch(() => cached);
     })
+  );
+});
+
+// A reminder pushed by the send-reminders Edge Function. The payload is JSON
+// built by that function; anything unparseable still shows a generic
+// notification rather than nothing, because Chrome requires every push to
+// produce one.
+self.addEventListener('push', event => {
+  let payload = {};
+  try {
+    payload = event.data ? event.data.json() : {};
+  } catch (err) {
+    payload = { title: 'Task due', body: event.data ? event.data.text() : '' };
+  }
+  const title = payload.title || 'Task due';
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body: payload.body || '',
+      tag: payload.taskId || undefined,
+      data: { url: payload.url || '.' },
+      badge: 'icons/icon.svg',
+      icon: 'icons/icon.svg',
+      renotify: !!payload.taskId,
+    })
+  );
+});
+
+// Push services rotate endpoints. Without this the device silently stops
+// receiving reminders and nothing indicates why.
+self.addEventListener('pushsubscriptionchange', event => {
+  event.waitUntil(
+    self.registration.pushManager
+      .subscribe(event.oldSubscription ? event.oldSubscription.options : { userVisibleOnly: true })
+      .then(subscription =>
+        self.clients.matchAll({ includeUncontrolled: true }).then(clients => {
+          // Hand it to any open page, which can store it via the authenticated
+          // Supabase client. If none is open, the app re-registers on next launch.
+          clients.forEach(c => c.postMessage({ type: 'push-subscription-changed', subscription: subscription.toJSON() }));
+        })
+      )
+      .catch(() => {})
   );
 });
 

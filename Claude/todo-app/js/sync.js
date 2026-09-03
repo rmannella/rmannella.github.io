@@ -203,6 +203,36 @@
     await reloadApp();
   }
 
+  // ---- push subscriptions ----
+  // Stored server-side so the reminder function can reach every device this
+  // account has enabled, including ones that are currently closed.
+  async function savePushSubscription(subscription) {
+    if (!client || !currentUser) throw new Error('Sign in first so reminders can reach this device.');
+    const key = k => btoa(String.fromCharCode(...new Uint8Array(subscription.getKey(k))));
+    const { error } = await client.from('push_subscriptions').upsert(
+      {
+        endpoint: subscription.endpoint,
+        user_id: currentUser.id,
+        p256dh: key('p256dh'),
+        auth: key('auth'),
+        user_agent: navigator.userAgent.slice(0, 200),
+        last_used_at: new Date().toISOString(),
+        failure_count: 0,
+      },
+      { onConflict: 'endpoint,user_id' }
+    );
+    if (error) throw error;
+  }
+
+  async function deletePushSubscription(endpoint) {
+    if (!client || !currentUser) return;
+    await client
+      .from('push_subscriptions')
+      .delete()
+      .eq('endpoint', endpoint)
+      .eq('user_id', currentUser.id);
+  }
+
   // ---- auth ----
   async function signInWithGoogle() {
     if (!client) return;
@@ -292,6 +322,8 @@
     signInWithGoogle,
     signOut,
     getStatus,
+    savePushSubscription,
+    deletePushSubscription,
     _test: { pullAndMerge, pushToRemote, pushDelete, subscribeRealtime, applyRealtimeChange, raw, readOutbox },
   };
 })();

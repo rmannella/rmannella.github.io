@@ -101,6 +101,34 @@ const Store = (() => {
     return !!t.due_date && t.due_date <= todayKey();
   }
 
+  /* ---------- subtasks ---------- */
+
+  function subtasks(parentId) {
+    return state.tasks
+      .filter(t => t.parent_id === parentId && t.status !== 'archived')
+      .sort((a, b) => manualOrder(a) - manualOrder(b));
+  }
+
+  function subtaskProgress(parentId) {
+    const children = subtasks(parentId);
+    if (!children.length) return null;
+    return { done: children.filter(c => c.status === 'completed').length, total: children.length };
+  }
+
+  async function addSubtask(parentId, title) {
+    const trimmed = title.trim();
+    if (!trimmed || !task(parentId)) return null;
+    const siblings = subtasks(parentId);
+    const [created] = await addTasks([
+      {
+        title: trimmed,
+        parent_id: parentId,
+        sort_order: siblings.length ? manualOrder(siblings[siblings.length - 1]) + 10 : 0,
+      },
+    ]);
+    return created;
+  }
+
   function matchesFilter(t) {
     if (state.activeTag === 'all') return true;
     return (t.priority_tags || []).includes(state.activeTag);
@@ -124,8 +152,12 @@ const Store = (() => {
     return manualOrder(a) - manualOrder(b);
   }
 
+  // Only top-level tasks appear in the main lists; children are rendered
+  // inside their parent's row.
   function visibleTasks(excludeId) {
-    return state.tasks.filter(t => t.id !== excludeId && isVisible(t) && matchesFilter(t));
+    return state.tasks.filter(
+      t => !t.parent_id && t.id !== excludeId && isVisible(t) && matchesFilter(t)
+    );
   }
 
   function openTasks(excludeId) {
@@ -144,23 +176,40 @@ const Store = (() => {
 
   function newTask(fields) {
     const now = nowIso();
-    return {
+    const task = {
       id: uid(),
       title: '',
       description: '',
+      parent_id: null,
       priority_tags: [],
       due_date: null,
       due_time: null,
+      due_at: null,
       location_trigger_id: null,
       status: 'open',
       completed_at: null,
       recurrence_rule: null,
       notified_at: null,
+      push_sent_at: null,
       sort_order: Date.now(),
       created_at: now,
       updated_at: now,
       ...fields,
     };
+    task.due_at = resolveDueAt(task);
+    return task;
+  }
+
+  // due_date/due_time are local wall-clock strings. A reminder sent from a
+  // server needs an absolute instant, and only this device knows which
+  // timezone "3:00 PM" was written in -- so it is resolved here and stored
+  // alongside, rather than being re-derived server-side.
+  function resolveDueAt(task) {
+    if (!task.due_date) return null;
+    const [h, m] = (task.due_time || '09:00').split(':').map(Number);
+    const d = parseDateKey(task.due_date);
+    d.setHours(h || 0, m || 0, 0, 0);
+    return d.toISOString();
   }
 
   async function addTasks(taskFields) {
@@ -172,18 +221,29 @@ const Store = (() => {
   }
 
   // Applies `changes` to a task, stamps updated_at, persists, and notifies.
-  async function updateTask(id, changes) {
+  async function updateTask(id, changes, { silent = false } = {}) {
     const t = task(id);
     if (!t) return null;
+    const dueMoved =
+      ('due_date' in changes && changes.due_date !== t.due_date) ||
+      ('due_time' in changes && changes.due_time !== t.due_time);
+
     Object.assign(t, changes, { updated_at: nowIso() });
+    t.due_at = resolveDueAt(t);
+    // Rescheduling makes any already-sent reminder stale, so let it fire again.
+    if (dueMoved && !('push_sent_at' in changes)) t.push_sent_at = null;
+
     await DB.put('tasks', t);
-    emit('tasks');
+    if (!silent) emit('tasks');
     return t;
   }
 
+  // Deleting a parent takes its steps with it -- an orphaned subtask would be
+  // invisible, since children only ever render inside a parent row.
   async function removeTask(id) {
-    await DB.remove('tasks', id);
-    state.tasks = state.tasks.filter(t => t.id !== id);
+    const ids = [id, ...subtasks(id).map(c => c.id)];
+    for (const taskId of ids) await DB.remove('tasks', taskId);
+    state.tasks = state.tasks.filter(t => !ids.includes(t.id));
     emit('tasks');
   }
 
@@ -209,6 +269,21 @@ const Store = (() => {
     await updateTask(id, { status: 'completed', completed_at: nowIso() });
     await bumpDigest('completed');
 
+    // Ticking off the parent means the whole checklist is done. The reverse
+    // is deliberately not automatic: finishing every step shows 5/5 but
+    // leaves the decision to close the task to you.
+    const openChildren = subtasks(id).filter(c => c.status !== 'completed');
+    if (openChildren.length) {
+      const now = nowIso();
+      openChildren.forEach(c => {
+        c.status = 'completed';
+        c.completed_at = now;
+        c.updated_at = now;
+      });
+      await DB.putMany('tasks', openChildren);
+      emit('tasks');
+    }
+
     // A recurring task spawns its next occurrence at completion time rather
     // than being rescheduled in place, so the completed one stays in history.
     const nextDue = nextDueDate(t.due_date, t.recurrence_rule);
@@ -216,9 +291,29 @@ const Store = (() => {
       // Carry the task's content forward, but let newTask() mint a fresh id
       // and timestamps for the new occurrence.
       const { id: _id, created_at: _c, updated_at: _u, ...carried } = t;
-      await addTasks([
-        { ...carried, status: 'open', completed_at: null, due_date: nextDue, notified_at: null },
+      const [next] = await addTasks([
+        {
+          ...carried,
+          status: 'open',
+          completed_at: null,
+          due_date: nextDue,
+          notified_at: null,
+          push_sent_at: null,
+        },
       ]);
+
+      // A repeating checklist is the main reason to have steps at all, so the
+      // next occurrence gets a fresh, unticked copy of them.
+      const steps = subtasks(id);
+      if (next && steps.length) {
+        await addTasks(
+          steps.map(step => ({
+            title: step.title,
+            parent_id: next.id,
+            sort_order: step.sort_order,
+          }))
+        );
+      }
     }
   }
 
@@ -385,6 +480,20 @@ const Store = (() => {
 
   /* ---------- housekeeping ---------- */
 
+  // Tasks written before due_at existed have a due date but no absolute
+  // instant, so server-side reminders would skip them. Runs once.
+  async function backfillDueAt() {
+    const stale = state.tasks.filter(t => t.due_date && !t.due_at);
+    if (!stale.length) return 0;
+    stale.forEach(t => {
+      t.due_at = resolveDueAt(t);
+      t.updated_at = nowIso();
+    });
+    await DB.putMany('tasks', stale);
+    emit('tasks');
+    return stale.length;
+  }
+
   // Yesterday's completed tasks are archived; archived tasks older than 30
   // days are deleted outright. Runs at most once per calendar day.
   async function rolloverAndPurge() {
@@ -427,12 +536,16 @@ const Store = (() => {
     setActiveTag,
     isVisible,
     isPinnedToday,
+    subtasks,
+    subtaskProgress,
+    resolveDueAt,
     openTasks,
     doneTasks,
     visibleTasks,
     nextDueDate,
     // writes
     addTasks,
+    addSubtask,
     updateTask,
     removeTask,
     toggleComplete,
@@ -447,6 +560,7 @@ const Store = (() => {
     removeLocation,
     resolveInferredLocation,
     bumpDigest,
+    backfillDueAt,
     rolloverAndPurge,
   };
 })();

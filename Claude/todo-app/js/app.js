@@ -79,11 +79,13 @@ function setupRefreshOnFocus() {
 async function init() {
   await Store.rolloverAndPurge();
   await Store.refresh();
+  await Store.backfillDueAt();
 
   UI.setupTabs();
   TasksUI.setup();
   SettingsUI.setup();
   RecordUI.setup();
+  PushUI.setup();
   setupGeofencer();
   setupRefreshOnFocus();
 
